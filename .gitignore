@@ -1,0 +1,32 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Caches and testing
+.pytest_cache/
+.coverage
+.ipynb_checkpoints/
+
+# Virtual Environments
+.venv/
+venv/
+env/
+
+# IDE files
+.vscode/
+.idea/
+
+# Streamlit Caches & temporary data downloads
+.streamlit/
+pyaging_data/
+
+# Ignore local generated tables and reports
+*.log
+*.html
+*.csv
+*.parquet
+*.json
+
+# EXCEPT key package resources!
+!epichronos/resources/*.json

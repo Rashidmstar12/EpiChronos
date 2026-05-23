@@ -1,0 +1,71 @@
+{
+    "Cellular Senescence (KEGG:hsa04218)": [
+        "CDKN2A", "TP53", "GLB1", "SIRT1", "RB1", "E2F1", "CDK4", "CCND1", "FOXO3", "AKT1", "PIK3CA", "MTOR"
+    ],
+    "Longevity Regulating Pathway (KEGG:hsa04211)": [
+        "SIRT1", "SIRT6", "MTOR", "FOXO3", "AKT1", "PIK3CA", "SOD1", "CAT", "GPX1", "PRKAA1", "PPARGC1A"
+    ],
+    "Telomere Maintenance (GO:0032200)": [
+        "TERT", "POT1", "TERF1", "TERF2", "ACD", "TINF2", "WRN", "BLM"
+    ],
+    "Autophagy (GO:0006914)": [
+        "BECN1", "ATG5", "ATG7", "MAP1LC3A", "ULK1", "MTOR", "AKT1", "PIK3CA"
+    ],
+    "mTOR Signaling Pathway (KEGG:hsa04150)": [
+        "MTOR", "AKT1", "PIK3CA", "PTEN", "TSC1", "TSC2", "RHEB", "RICTOR", "RPTOR"
+    ],
+    "Inflammatory Response (GO:0006954)": [
+        "NFKB1", "IL6", "TNF", "IL1B", "IL10", "CXCL8", "CCL2", "PTGS2", "STAT3", "JUN", "FOS"
+    ],
+    "NF-kappa B Signaling Pathway (KEGG:hsa04064)": [
+        "NFKB1", "RELA", "RELB", "NFKB2", "CHUK", "IKBKB", "IKBKG", "TNFAIP3", "TRAF6"
+    ],
+    "T-Cell Receptor Signaling Pathway (KEGG:hsa04660)": [
+        "CD4", "CD8A", "CD3D", "CD3E", "CD3G", "LCK", "ZAP70", "FYN", "LAT", "SLP76"
+    ],
+    "B-Cell Activation (GO:0042113)": [
+        "CD19", "CD79A", "CD79B", "SYK", "BLNK", "BTK", "PLCG2", "LYN"
+    ],
+    "Cytokine-Cytokine Receptor Interaction (KEGG:hsa04060)": [
+        "IL6", "TNF", "IL1B", "IL10", "IL2", "IL4", "IL17A", "IFNG", "TGFB1", "CSF2"
+    ],
+    "Apoptosis (KEGG:hsa04210)": [
+        "TP53", "BCL2", "BAX", "CASP3", "CASP8", "CASP9", "FADD", "FAS", "XIAP", "CYCS"
+    ],
+    "TP53 Signaling Pathway (KEGG:hsa04115)": [
+        "TP53", "CDKN1A", "MDM2", "BAX", "BBC3", "PMAIP1", "GADD45A", "SFN"
+    ],
+    "Cell Cycle Regulation (GO:0007049)": [
+        "CDK1", "CDK2", "CDK4", "CDK6", "CCNB1", "CCND1", "CCNE1", "RB1", "E2F1", "BUB1"
+    ],
+    "DNA Damage Repair (GO:0006974)": [
+        "BRCA1", "ATM", "ATR", "TP53", "CHEK1", "CHEK2", "RAD51", "MRE11", "RAD50", "NBN"
+    ],
+    "RAS Signaling Pathway (KEGG:hsa04014)": [
+        "HRAS", "KRAS", "NRAS", "RAF1", "MAP2K1", "MAPK1", "MAPK3", "GRB2", "SOS1"
+    ],
+    "DNA Methylation (GO:0006306)": [
+        "DNMT1", "DNMT3A", "DNMT3B", "TET1", "TET2", "TET3", "TDG", "MBD2", "MBD4"
+    ],
+    "Histone Modification (GO:0016570)": [
+        "HDAC1", "HDAC2", "EP300", "CREBBP", "EZH2", "SUV39H1", "KMT2A", "HAT1"
+    ],
+    "Chromatin Remodeling (GO:0006338)": [
+        "SMARCA4", "SMARCB1", "ARID1A", "CHD4", "INO80", "ATRX", "BPTF"
+    ],
+    "Epigenetic Maintenance (GO:0016569)": [
+        "DNMT1", "DNMT3A", "DNMT3B", "TET2", "SIRT1", "SIRT6", "EZH2", "HDAC1"
+    ],
+    "Glycolysis (KEGG:hsa00010)": [
+        "HK1", "HK2", "GPI", "PFKM", "ALDOA", "GAPDH", "PGK1", "PGAM1", "ENO1", "PKM", "LDHA"
+    ],
+    "Lipid Metabolism (GO:0006629)": [
+        "FASN", "ACACA", "SREBF1", "SREBF2", "PPARG", "PPARA", "CPT1A", "ACOX1", "LPL"
+    ],
+    "AMPK Signaling Pathway (KEGG:hsa04152)": [
+        "PRKAA1", "PRKAA2", "PRKAB1", "PRKAG1", "SIRT1", "PPARGC1A", "EEF2K"
+    ],
+    "Oxidative Phosphorylation (KEGG:hsa00190)": [
+        "NDUFS1", "SDHA", "COX4I1", "ATP5F1A", "ATP5F1B", "UQCRB", "CYC1"
+    ]
+}
