@@ -67,3 +67,43 @@ def test_call_dmrs():
     assert dmrs["start"][0] == 1000
     assert dmrs["end"][0] == 2200
     assert dmrs["num_sites"][0] == 4
+
+
+def test_call_dmls_regression():
+    # Make synthetic dataset
+    beta_df = pl.DataFrame({
+        "chrom": ["chr1", "chr1"],
+        "pos": [100, 200],
+        "ctrl1": [0.5, 0.1],
+        "ctrl2": [0.6, 0.2],
+        "treat1": [0.55, 0.8],
+        "treat2": [0.49, 0.9]
+    })
+    
+    ds = MethylationDataset(beta_df)
+    
+    # Design matrix: columns are [intercept, group_effect, batch_effect]
+    design = np.array([
+        [1.0, 0.0, 0.0],
+        [1.0, 0.0, 1.0],
+        [1.0, 1.0, 0.0],
+        [1.0, 1.0, 1.0]
+    ])
+    
+    samples = ["ctrl1", "ctrl2", "treat1", "treat2"]
+    
+    # Run multiple regression testing Group effect (coef_index=1)
+    res = call_dmls(
+        ds, 
+        method="regression", 
+        design_matrix=design, 
+        coef_index=1, 
+        samples_order=samples
+    )
+    
+    assert res.height == 2
+    assert "beta_coefficient" in res.columns
+    
+    # pos 200 should have a highly significant group effect
+    p_200 = res.filter(pl.col("pos") == 200)["p_value"][0]
+    assert p_200 < 0.05

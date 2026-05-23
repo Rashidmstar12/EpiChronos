@@ -64,3 +64,29 @@ def test_missing_data_imputation():
     assert clock_res.height == 2
     assert not np.isnan(clock_res["biological_age"][0])
     assert not np.isnan(clock_res["biological_age"][1])
+
+
+def test_clocks_assembly_awareness():
+    fallback_mock_hg38 = {
+        "cg00000029": ("chr16", 53434600),
+        "cg00000292": ("chr16", 28881200),
+    }
+    
+    c_29 = fallback_mock_hg38["cg00000029"]
+    c_292 = fallback_mock_hg38["cg00000292"]
+    
+    beta_df = pl.DataFrame({
+        "chrom": [c_29[0], c_292[0]],
+        "pos": [c_29[1], c_292[1]],
+        "young_sample": [0.1, 0.9],
+        "old_sample": [0.9, 0.1]
+    })
+    
+    ds = MethylationDataset(beta_df)
+    
+    # Run clock calculation. It should automatically detect hg38 and align coordinates
+    clock_res = calculate_biological_age(ds, clock_name="horvath")
+    
+    assert clock_res.height == 2
+    assert not np.isnan(clock_res["biological_age"][0])
+    assert not np.isnan(clock_res["biological_age"][1])

@@ -39,23 +39,111 @@ def fdr_correction(p_values: np.ndarray) -> np.ndarray:
 
 def call_dmls(
     dataset: MethylationDataset,
-    group_a_samples: List[str],
-    group_b_samples: List[str],
-    method: str = "t-test"
+    group_a_samples: Optional[List[str]] = None,
+    group_b_samples: Optional[List[str]] = None,
+    method: str = "t-test",
+    design_matrix: Optional[np.ndarray] = None,
+    coef_index: int = 1,
+    samples_order: Optional[List[str]] = None
 ) -> pl.DataFrame:
     """
     Perform high-speed, vectorized calling of Differentially Methylated Loci (DMLs).
-    Compares methylation beta values between Group A and Group B.
+    Supports Welch's t-test or multiple linear regression with covariates (design matrix).
     
     Args:
         dataset: Unified MethylationDataset.
-        group_a_samples: List of sample names in Group A.
-        group_b_samples: List of sample names in Group B.
-        method: Statistical method ('t-test' for Welch's t-test).
+        group_a_samples: Optional list of sample names in Group A (required for t-test).
+        group_b_samples: Optional list of sample names in Group B (required for t-test).
+        method: Statistical method ('t-test' for Welch's t-test, or 'regression' when using design_matrix).
+        design_matrix: Optional N x P numpy array representing the regression design matrix.
+        coef_index: The index of the design matrix column representing the group effect to test.
+        samples_order: The list of sample names corresponding to the rows of design_matrix.
         
     Returns:
         Polars DataFrame containing DML statistics and FDR-adjusted q-values.
     """
+    # 1. Regression-based DML calling (with design matrix)
+    if design_matrix is not None or method == "regression":
+        if design_matrix is None:
+            raise ValueError("design_matrix must be provided when method is 'regression'.")
+        if samples_order is None:
+            raise ValueError("samples_order must be specified when using a design_matrix.")
+            
+        n_samples_reg = len(samples_order)
+        assert design_matrix.shape[0] == n_samples_reg, "Number of rows in design_matrix must equal the number of samples in samples_order"
+        
+        # Check that samples exist
+        for s in samples_order:
+            assert s in dataset.samples, f"Sample '{s}' not found in dataset"
+            
+        # Get beta values matrix (M sites, N samples)
+        S = dataset.beta_df.select(samples_order).to_numpy().astype(np.float64)
+        
+        # Cohort-mean imputation per site (regression cannot have NaNs)
+        row_means = np.nanmean(S, axis=1)
+        row_means = np.nan_to_num(row_means, nan=0.5)
+        inds = np.where(np.isnan(S))
+        S[inds] = row_means[inds[0]]
+        
+        # Design matrix X: shape (N, P)
+        X = design_matrix.astype(np.float64)
+        N, P = X.shape
+        assert N > P, f"Number of samples ({N}) must be greater than number of covariates ({P}) for statistical calling."
+        
+        # Solve OLS: beta = (X^T X)^{-1} X^T Y^T where Y_T shape (N, M)
+        Y_T = S.T
+        XtX = X.T @ X
+        try:
+            XtX_inv = np.linalg.inv(XtX)
+        except np.linalg.LinAlgError:
+            XtX_inv = np.linalg.pinv(XtX)
+            
+        beta = XtX_inv @ X.T @ Y_T  # Shape: (P, M)
+        
+        # Residuals E = Y_T - X * beta (N, M)
+        E = Y_T - (X @ beta)
+        
+        # Residual Sum of Squares (RSS) shape: (M,)
+        RSS = np.sum(E**2, axis=0)
+        
+        # Residual variance (sigma_sq) shape: (M,)
+        df = N - P
+        sigma_sq = RSS / df
+        
+        # Standard error of coefficient coef_index
+        se = np.sqrt(sigma_sq * XtX_inv[coef_index, coef_index])
+        
+        # Avoid division by zero
+        eps = 1e-9
+        se = np.maximum(se, eps)
+        
+        # t-statistic shape: (M,)
+        t_stat = beta[coef_index, :] / se
+        
+        # Two-sided p-values
+        p_values = 2 * stats.t.sf(np.abs(t_stat), df=df)
+        p_values = np.nan_to_num(p_values, nan=1.0)
+        
+        # Multiple testing FDR correction
+        q_values = fdr_correction(p_values)
+        
+        # Construct results DataFrame
+        coords = dataset.beta_df.select(["chrom", "pos"])
+        res_df = pl.DataFrame({
+            "chrom": coords["chrom"],
+            "pos": coords["pos"],
+            "beta_coefficient": beta[coef_index, :],
+            "t_stat": t_stat,
+            "p_value": p_values,
+            "q_value": q_values
+        })
+        
+        return res_df.sort(["chrom", "pos"])
+        
+    # 2. Welch's t-test default DML calling (Group A vs Group B)
+    if group_a_samples is None or group_b_samples is None:
+        raise ValueError("Either group_a_samples and group_b_samples OR design_matrix must be provided.")
+        
     # Check that samples exist
     for s in group_a_samples + group_b_samples:
         assert s in dataset.samples, f"Sample '{s}' not found in dataset"

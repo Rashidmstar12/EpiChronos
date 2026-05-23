@@ -52,7 +52,7 @@ def annotate_dmrs_to_genes(
     Returns:
         Polars DataFrame containing DMR coordinates aligned with gene annotations.
     """
-    if dmr_df.height == 0:
+    if dmr_df.height == 0 or not GENE_MANIFEST:
         return pl.DataFrame(schema={
             "chrom": pl.String,
             "start": pl.Int64,
@@ -61,58 +61,41 @@ def annotate_dmrs_to_genes(
             "distance": pl.Int64
         })
         
-    dmr_chroms = dmr_df["chrom"].to_list()
-    dmr_starts = dmr_df["start"].to_list()
-    dmr_ends = dmr_df["end"].to_list()
+    # Build Polars Gene Reference
+    gene_df = pl.DataFrame({
+        "gene": list(GENE_MANIFEST.keys()),
+        "chrom": [v[0] for v in GENE_MANIFEST.values()],
+        "g_start": [v[1] for v in GENE_MANIFEST.values()],
+        "g_end": [v[2] for v in GENE_MANIFEST.values()]
+    })
     
-    res_chroms = []
-    res_starts = []
-    res_ends = []
-    res_genes = []
-    res_dists = []
+    # Fast Hash Join on Chromosome
+    joined = dmr_df.join(gene_df, on="chrom")
     
-    for i in range(len(dmr_chroms)):
-        c_chrom = dmr_chroms[i]
-        c_start = dmr_starts[i]
-        c_end = dmr_ends[i]
-        c_center = (c_start + c_end) // 2
-        
-        for gene, (g_chrom, g_start, g_end) in GENE_MANIFEST.items():
-            if c_chrom != g_chrom:
-                continue
-                
-            # Calculate distance to gene boundary or gene center
-            dist = 0
-            if c_center < g_start:
-                dist = g_start - c_end
-            elif c_center > g_end:
-                dist = c_start - g_end
-            else:
-                dist = 0  # Overlapping
-                
-            if dist <= max_dist_bp:
-                res_chroms.append(c_chrom)
-                res_starts.append(c_start)
-                res_ends.append(c_end)
-                res_genes.append(gene)
-                res_dists.append(dist)
-                
-    if len(res_genes) == 0:
-        return pl.DataFrame(schema={
-            "chrom": pl.String,
-            "start": pl.Int64,
-            "end": pl.Int64,
-            "gene": pl.String,
-            "distance": pl.Int64
-        })
-        
-    return pl.DataFrame({
-        "chrom": res_chroms,
-        "start": res_starts,
-        "end": res_ends,
-        "gene": res_genes,
-        "distance": res_dists
-    }).sort(["chrom", "start"])
+    # Compute center of DMR
+    center = (pl.col("start") + pl.col("end")) // 2
+    
+    # Compute distance:
+    # if center < g_start: dist = g_start - end
+    # else if center > g_end: dist = start - g_end
+    # else: dist = 0 (overlapping)
+    dist_expr = (
+        pl.when(center < pl.col("g_start"))
+        .then(pl.col("g_start") - pl.col("end"))
+        .when(center > pl.col("g_end"))
+        .then(pl.col("start") - pl.col("g_end"))
+        .otherwise(0)
+    )
+    
+    # Select, filter and sort
+    annotated = (
+        joined.with_columns(dist_expr.alias("distance"))
+        .filter(pl.col("distance") <= max_dist_bp)
+        .select(["chrom", "start", "end", "gene", "distance"])
+        .sort(["chrom", "start"])
+    )
+    
+    return annotated
 
 
 def perform_pathway_enrichment(

@@ -44,14 +44,20 @@ def test_load_nanopore_modkit():
         min_cov=5
     )
     
-    # Assert alignment
-    assert dataset.shape[0] == 1
+    # Assert alignment: with outer joins, both chr1:1000 and chr1:2000 are preserved in the dataset
+    assert dataset.shape[0] == 2
     assert dataset.beta_df["chrom"][0] == "chr1"
     assert dataset.beta_df["pos"][0] == 1000
     assert dataset.beta_df["S_A"][0] == 0.8
     assert dataset.beta_df["S_B"][0] == 0.9
     assert dataset.cov_df["S_A"][0] == 10
     assert dataset.cov_df["S_B"][0] == 15
+    
+    # Verification of the second aligned row (stochastic site kept in S_A, null in S_B)
+    assert dataset.beta_df["pos"][1] == 2000
+    assert dataset.beta_df["S_A"][1] == 0.25
+    assert dataset.beta_df["S_B"][1] is None or np.isnan(dataset.beta_df["S_B"][1])
+    assert dataset.cov_df["S_B"][1] == 0
 
 
 def test_load_pacbio_bedgraph():

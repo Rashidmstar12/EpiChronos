@@ -368,10 +368,10 @@ def load_bismark_coverage(
         ldf = ldf.select(["chrom", "pos", name, f"{name}_cov"])
         lazy_dfs.append(ldf)
         
-    # Perform sequential inner joins to align all samples by chrom and pos
+    # Perform sequential outer joins to align all samples by chrom and pos
     combined = lazy_dfs[0]
     for next_df in lazy_dfs[1:]:
-        combined = combined.join(next_df, on=["chrom", "pos"], how="inner")
+        combined = combined.join(next_df, on=["chrom", "pos"], how="outer")
         
     # Trigger computation
     df = combined.collect()
@@ -382,9 +382,9 @@ def load_bismark_coverage(
     
     beta_df = df.select(beta_cols)
     
-    # Rename cov columns to match sample names for consistent indexing
+    # Rename cov columns to match sample names for consistent indexing and fill nulls with 0
     cov_df = df.select(cov_cols)
-    cov_df = cov_df.rename({f"{name}_cov": name for name in sample_names})
+    cov_df = cov_df.rename({f"{name}_cov": name for name in sample_names}).fill_null(0)
     
     return MethylationDataset(beta_df, cov_df)
 
@@ -570,10 +570,10 @@ def load_nanopore_modkit(
         ldf = ldf.select(["chrom", "pos", name, f"{name}_cov"])
         lazy_dfs.append(ldf)
         
-    # Perform sequential inner joins to align all samples by chrom and pos
+    # Perform sequential outer joins to align all samples by chrom and pos
     combined = lazy_dfs[0]
     for next_df in lazy_dfs[1:]:
-        combined = combined.join(next_df, on=["chrom", "pos"], how="inner")
+        combined = combined.join(next_df, on=["chrom", "pos"], how="outer")
         
     # Trigger computation
     df = combined.collect()
@@ -584,7 +584,7 @@ def load_nanopore_modkit(
     
     beta_df = df.select(beta_cols)
     cov_df = df.select(cov_cols)
-    cov_df = cov_df.rename({f"{name}_cov": name for name in sample_names})
+    cov_df = cov_df.rename({f"{name}_cov": name for name in sample_names}).fill_null(0)
     
     return MethylationDataset(beta_df, cov_df)
 
@@ -657,10 +657,10 @@ def load_pacbio_bedgraph(
         ldf = ldf.select(["chrom", "pos", name, f"{name}_cov"])
         lazy_dfs.append(ldf)
         
-    # Perform sequential inner joins to align all samples by chrom and pos
+    # Perform sequential outer joins to align all samples by chrom and pos
     combined = lazy_dfs[0]
     for next_df in lazy_dfs[1:]:
-        combined = combined.join(next_df, on=["chrom", "pos"], how="inner")
+        combined = combined.join(next_df, on=["chrom", "pos"], how="outer")
         
     # Trigger computation
     df = combined.collect()
@@ -671,7 +671,7 @@ def load_pacbio_bedgraph(
     
     beta_df = df.select(beta_cols)
     cov_df = df.select(cov_cols)
-    cov_df = cov_df.rename({f"{name}_cov": name for name in sample_names})
+    cov_df = cov_df.rename({f"{name}_cov": name for name in sample_names}).fill_null(0)
     
     return MethylationDataset(beta_df, cov_df)
 
