@@ -175,6 +175,58 @@ STRICT GROUNDING RULES: Do not make up fake chromosomes or coordinate positions.
             )
 
     @staticmethod
+    def chat_completion(
+        messages: List[Dict[str, str]],
+        dataset: MethylationDataset,
+        dmr_df: pl.DataFrame,
+        enrich_df: Optional[pl.DataFrame],
+        clock_df: pl.DataFrame,
+        decon_df: Optional[pl.DataFrame],
+        api_key: Optional[str] = None,
+        base_url: str = "https://api.openai.com/v1",
+        model_name: str = "gpt-4o-mini",
+        is_thinking_model: bool = False
+    ) -> str:
+        """
+        Interactive chat completion with cohort context injected into system prompt.
+        """
+        if not api_key:
+            return "*(Please enter a valid API Key in the Copilot Configuration to use the interactive chat. Mock Response: Your epigenetic analysis shows distinct differential methylation patterns.)*"
+
+        cpg_count = dataset.shape[0]
+        sample_count = len(dataset.samples)
+        
+        system_instruction = f"You are a principal computational biologist and molecular epigeneticist helping a researcher analyze their DNA methylation cohort. Dataset context: {sample_count} samples, {cpg_count} aligned CpGs. "
+        if clock_df.height > 0:
+            avg_bio_age = clock_df["biological_age"].mean()
+            system_instruction += f"Average Biological Age: {avg_bio_age:.2f} years. "
+
+        if is_thinking_model:
+            # Merge system instruction into the first user message for strict reasoning models
+            prepared_messages = []
+            for i, msg in enumerate(messages):
+                if i == 0 and msg["role"] == "user":
+                    prepared_messages.append({"role": "user", "content": f"{system_instruction}\n\n{msg['content']}"})
+                else:
+                    prepared_messages.append(msg)
+            payload = {"model": model_name, "messages": prepared_messages}
+        else:
+            prepared_messages = [{"role": "system", "content": system_instruction}] + messages
+            payload = {"model": model_name, "messages": prepared_messages, "temperature": 0.4}
+
+        base_url = base_url.rstrip("/")
+        url = f"{base_url}/chat/completions"
+        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+        
+        try:
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=45) as response:
+                res_data = json.loads(response.read().decode("utf-8"))
+                return res_data["choices"][0]["message"]["content"]
+        except Exception as e:
+            return f"*(Error calling AI API: {str(e)})*"
+
+    @staticmethod
     def _generate_mock_report(
         cpg_count, sample_count, groups_desc, called_genes, top_pathways,
         avg_bio_age, avg_chron_age, avg_accel, has_accel, decon_summary, pubmed_links, focus_area

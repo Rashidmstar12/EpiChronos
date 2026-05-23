@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [
-    { name = "EpiChronos Developer Team", email = "developer@epichronos.org" }
+    { name = "EpiChronos Developer Team", email = "rashidmstar12@gmail.com" }
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -34,8 +34,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/developer/epichronos"
-Bug-Tracker = "https://github.com/developer/epichronos/issues"
+Homepage = "https://github.com/Rashidmstar12/EpiChronos"
+Bug-Tracker = "https://github.com/Rashidmstar12/EpiChronos/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

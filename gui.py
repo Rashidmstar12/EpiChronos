@@ -631,7 +631,7 @@ if st.session_state.analyzed:
     st.write("---")
 
     # Tabs
-    tab_overview, tab_pca, tab_dml, tab_enrich, tab_decon, tab_meqtl, tab_clocks, tab_ai, tab_export = st.tabs([
+    tab_overview, tab_pca, tab_dml, tab_enrich, tab_decon, tab_meqtl, tab_clocks, tab_figures, tab_ai, tab_export = st.tabs([
         "📁 Aligned Data Preview", 
         "🌀 Dimensionality Reduction (PCA)", 
         "⚡ Differential Methylation (DML/DMR)", 
@@ -639,6 +639,7 @@ if st.session_state.analyzed:
         "🩸 Cell-Type Deconvolution",
         "🔗 Transcription meQTL Linker",
         "⏰ Epigenetic Clocks & Aging",
+        "📊 Publication Figures",
         "🤖 AI Research Assistant",
         "📥 Export Report"
     ])
@@ -1021,6 +1022,397 @@ if st.session_state.analyzed:
                 st.markdown("### Calculated Epigenetic Age Scores")
                 st.dataframe(clock_df.to_pandas(), use_container_width=True)
             
+    # ═══════════════════════════════════════════════════════════════════
+    # PUBLICATION FIGURES TAB
+    # ═══════════════════════════════════════════════════════════════════
+    with tab_figures:
+        import io as _io
+        st.subheader("📊 Publication-Ready Figures")
+        st.write(
+            "All 8 publication-grade charts — click **📥 Download PNG** under any figure "
+            "to save a high-resolution image ready for journal submission."
+        )
+
+        def _png_download_button(fig, filename, label="📥 Download PNG"):
+            """Render a Streamlit download button for a Plotly figure as PNG."""
+            try:
+                img_bytes = fig.to_image(format="png", width=1400, height=800, scale=2)
+                st.download_button(
+                    label=label,
+                    data=img_bytes,
+                    file_name=filename,
+                    mime="image/png",
+                    use_container_width=True
+                )
+            except Exception:
+                st.caption("*(PNG export requires `kaleido`: `pip install kaleido`)*")
+
+        # ─── Figure 1: Beta Value Distribution ────────────────────────
+        st.markdown("---")
+        st.markdown("### Figure 1 — Global CpG Beta Value Distribution")
+        st.caption("Shows the overall methylation landscape across your cohort. Bimodal peaks at 0 and 1 confirm good methylation calling quality.")
+        fig1_col, fig1_btn = st.columns([5, 1])
+        with fig1_col:
+            sample_cols = dataset.samples
+            beta_pd = dataset.beta_df.select(sample_cols).to_pandas()
+            import plotly.figure_factory as ff
+            hist_data = []
+            group_labels = []
+            colors_fig1 = px.colors.qualitative.G10
+            for i, s in enumerate(sample_cols[:8]):
+                vals = beta_pd[s].dropna().values
+                if len(vals) > 0:
+                    hist_data.append(vals.tolist())
+                    group_labels.append(s)
+            if hist_data:
+                fig1 = ff.create_distplot(
+                    hist_data, group_labels,
+                    bin_size=0.02, show_rug=False, show_hist=False,
+                    colors=colors_fig1[:len(hist_data)]
+                )
+                fig1.update_layout(
+                    template="plotly_dark",
+                    title="Per-Sample CpG Beta Value Density Distribution",
+                    xaxis_title="Beta Value (methylation proportion)",
+                    yaxis_title="Density",
+                    legend_title="Sample",
+                    font=dict(family="Inter", size=13)
+                )
+                st.plotly_chart(fig1, use_container_width=True)
+        with fig1_btn:
+            st.write("")
+            st.write("")
+            if hist_data:
+                _png_download_button(fig1, "fig1_beta_distribution.png")
+
+        # ─── Figure 2: Top-N CpG Heatmap ──────────────────────────────
+        st.markdown("---")
+        st.markdown("### Figure 2 — Top Differentially Methylated CpG Heatmap")
+        st.caption("Heatmap of the top most variable CpGs across all samples. Reveals sample clustering and methylation patterns at a glance.")
+        fig2_col, fig2_btn = st.columns([5, 1])
+        with fig2_col:
+            n_top = st.slider("Number of top CpGs to display", 20, 200, 50, key="heatmap_n")
+            sample_cols_hm = dataset.samples
+            beta_mat = dataset.beta_df.select(sample_cols_hm).to_pandas()
+            variances = beta_mat.var(axis=1)
+            top_idx = variances.nlargest(n_top).index
+            heatmap_data = beta_mat.loc[top_idx].fillna(0.5)
+            coords = dataset.beta_df.select(["chrom", "pos"]).to_pandas()
+            y_labels = [
+                f"{coords.loc[i,'chrom']}:{coords.loc[i,'pos']}" 
+                for i in top_idx
+            ]
+            fig2 = go.Figure(data=go.Heatmap(
+                z=heatmap_data.values,
+                x=sample_cols_hm,
+                y=y_labels,
+                colorscale="RdBu_r",
+                zmid=0.5,
+                colorbar=dict(title="Beta Value")
+            ))
+            fig2.update_layout(
+                template="plotly_dark",
+                title=f"Top {n_top} Most Variable CpGs — Methylation Heatmap",
+                xaxis_title="Sample",
+                yaxis_title="CpG Coordinate",
+                yaxis=dict(tickfont=dict(size=8)),
+                height=max(400, n_top * 12),
+                font=dict(family="Inter", size=13)
+            )
+            st.plotly_chart(fig2, use_container_width=True)
+        with fig2_btn:
+            st.write("")
+            st.write("")
+            _png_download_button(fig2, "fig2_cpg_heatmap.png")
+
+        # ─── Figure 3: Manhattan Plot ──────────────────────────────────
+        st.markdown("---")
+        st.markdown("### Figure 3 — Genome-Wide Manhattan Plot")
+        st.caption("Genome-wide distribution of DML significance. Peaks above the red line (p < 0.05 after FDR) indicate significant loci.")
+        fig3_col, fig3_btn = st.columns([5, 1])
+        with fig3_col:
+            if dml_df.height > 0:
+                manh_pd = dml_df.to_pandas().copy()
+                manh_pd["neg_log_p"] = -np.log10(manh_pd["p_value"] + 1e-300)
+                # Assign numeric chromosome order
+                chrom_order = [f"chr{i}" for i in range(1, 23)] + ["chrX", "chrY", "chrM"]
+                chrom_present = [c for c in chrom_order if c in manh_pd["chrom"].values]
+                other_chroms = sorted([c for c in manh_pd["chrom"].unique() if c not in chrom_order])
+                chrom_present += other_chroms
+                chrom_map = {c: i for i, c in enumerate(chrom_present)}
+                manh_pd["chrom_num"] = manh_pd["chrom"].map(chrom_map).fillna(0)
+                manh_pd["x_pos"] = manh_pd["chrom_num"] * 1000 + (manh_pd["pos"] / manh_pd["pos"].max() * 900)
+                palette = px.colors.qualitative.Alphabet
+                manh_pd["color"] = manh_pd["chrom_num"].apply(lambda x: palette[int(x) % len(palette)])
+                manh_pd["sig"] = manh_pd["p_value"] <= p_cutoff
+                fig3 = go.Figure()
+                # Non-significant
+                ns = manh_pd[~manh_pd["sig"]]
+                fig3.add_trace(go.Scattergl(
+                    x=ns["x_pos"], y=ns["neg_log_p"],
+                    mode="markers", name="Not Significant",
+                    marker=dict(color=ns["color"], size=4, opacity=0.5),
+                    text=ns["chrom"].astype(str) + ":" + ns["pos"].astype(str),
+                    hovertemplate="%{text}<br>-log10(p)=%{y:.2f}<extra></extra>"
+                ))
+                # Significant
+                sig = manh_pd[manh_pd["sig"]]
+                if len(sig) > 0:
+                    fig3.add_trace(go.Scattergl(
+                        x=sig["x_pos"], y=sig["neg_log_p"],
+                        mode="markers", name="Significant",
+                        marker=dict(color="#f43f5e", size=7, opacity=0.9),
+                        text=sig["chrom"].astype(str) + ":" + sig["pos"].astype(str),
+                        hovertemplate="%{text}<br>-log10(p)=%{y:.2f}<extra></extra>"
+                    ))
+                # Significance threshold line
+                sig_line = -np.log10(p_cutoff)
+                fig3.add_hline(y=sig_line, line_dash="dash", line_color="#ef4444",
+                               annotation_text=f"p = {p_cutoff}", annotation_position="top right")
+                # X-axis chromosome labels
+                tick_vals = [chrom_map[c] * 1000 + 450 for c in chrom_present if c in chrom_map]
+                fig3.update_layout(
+                    template="plotly_dark",
+                    title="Genome-Wide Association — Manhattan Plot",
+                    xaxis=dict(tickmode="array", tickvals=tick_vals, ticktext=chrom_present,
+                               tickangle=45, title="Chromosome"),
+                    yaxis_title="-log₁₀(P-Value)",
+                    height=500,
+                    showlegend=True,
+                    font=dict(family="Inter", size=13)
+                )
+                st.plotly_chart(fig3, use_container_width=True)
+            else:
+                st.info("Manhattan plot requires DML results from differential methylation calling.")
+                fig3 = None
+        with fig3_btn:
+            st.write("")
+            st.write("")
+            if dml_df.height > 0 and fig3 is not None:
+                _png_download_button(fig3, "fig3_manhattan_plot.png")
+
+        # ─── Figure 4: Sample-Sample Correlation Matrix ────────────────
+        st.markdown("---")
+        st.markdown("### Figure 4 — Sample–Sample Pearson Correlation Matrix")
+        st.caption("Pairwise correlations between all samples. High correlations within the same group confirm cohort quality. Outliers indicate batch effects or mislabelled samples.")
+        fig4_col, fig4_btn = st.columns([5, 1])
+        with fig4_col:
+            sample_cols_corr = dataset.samples
+            beta_corr = dataset.beta_df.select(sample_cols_corr).to_pandas().fillna(0.5)
+            corr_matrix = beta_corr.corr(method="pearson")
+            fig4 = go.Figure(data=go.Heatmap(
+                z=corr_matrix.values,
+                x=sample_cols_corr,
+                y=sample_cols_corr,
+                colorscale="RdBu",
+                zmid=0,
+                zmin=-1, zmax=1,
+                colorbar=dict(title="Pearson r"),
+                text=np.round(corr_matrix.values, 3),
+                texttemplate="%{text}",
+                textfont=dict(size=11)
+            ))
+            fig4.update_layout(
+                template="plotly_dark",
+                title="Pairwise Sample Methylation Pearson Correlation Matrix",
+                xaxis_title="Sample",
+                yaxis_title="Sample",
+                height=500,
+                font=dict(family="Inter", size=13)
+            )
+            st.plotly_chart(fig4, use_container_width=True)
+        with fig4_btn:
+            st.write("")
+            st.write("")
+            _png_download_button(fig4, "fig4_correlation_matrix.png")
+
+        # ─── Figure 5: Coverage Depth Distribution ────────────────────
+        st.markdown("---")
+        st.markdown("### Figure 5 — Per-Sample CpG Coverage Depth Distribution")
+        st.caption("Shows how deeply each CpG was sequenced per sample. Low-coverage samples may need exclusion. Useful for Methods section figures.")
+        fig5_col, fig5_btn = st.columns([5, 1])
+        with fig5_col:
+            if dataset.cov_df is not None:
+                cov_pd = dataset.cov_df.select(dataset.samples).to_pandas()
+                box_traces = []
+                for s in dataset.samples:
+                    vals = cov_pd[s].dropna().values
+                    box_traces.append(go.Box(
+                        y=vals, name=s,
+                        boxpoints="outliers",
+                        marker=dict(size=3),
+                        line=dict(width=2)
+                    ))
+                fig5 = go.Figure(data=box_traces)
+                fig5.update_layout(
+                    template="plotly_dark",
+                    title="Per-Sample CpG Read Depth (Coverage) Distribution",
+                    yaxis_title="Read Depth (×)",
+                    xaxis_title="Sample",
+                    height=500,
+                    showlegend=False,
+                    font=dict(family="Inter", size=13)
+                )
+                st.plotly_chart(fig5, use_container_width=True)
+            else:
+                # Simulate coverage hint if no cov_df
+                st.info("Coverage distribution plot requires a loaded coverage matrix (e.g. from Bismark .cov files). Array data does not include coverage depth.")
+                fig5 = None
+        with fig5_btn:
+            st.write("")
+            st.write("")
+            if dataset.cov_df is not None and fig5 is not None:
+                _png_download_button(fig5, "fig5_coverage_distribution.png")
+
+        # ─── Figure 6: Age Acceleration Violin Plot ────────────────────
+        st.markdown("---")
+        st.markdown("### Figure 6 — Epigenetic Age Acceleration by Group (Violin Plot)")
+        st.caption("Compares the distribution of epigenetic age acceleration across phenotypic groups. Positive values = accelerated aging.")
+        fig6_col, fig6_btn = st.columns([5, 1])
+        with fig6_col:
+            if clock_df.height > 0 and "age_acceleration" in clock_df.columns:
+                clock_pd_v = clock_df.to_pandas()
+                # Add group labels
+                clock_pd_v["Group"] = clock_pd_v["sample"].map(
+                    lambda s: dataset.metadata.get(s, "Unknown")
+                )
+                fig6 = go.Figure()
+                groups_v = clock_pd_v["Group"].unique()
+                colors_v = px.colors.qualitative.G10
+                for idx_g, grp in enumerate(groups_v):
+                    grp_data = clock_pd_v[clock_pd_v["Group"] == grp]["age_acceleration"].dropna()
+                    fig6.add_trace(go.Violin(
+                        y=grp_data,
+                        name=grp,
+                        box_visible=True,
+                        meanline_visible=True,
+                        points="all",
+                        jitter=0.3,
+                        marker=dict(size=8),
+                        line_color=colors_v[idx_g % len(colors_v)]
+                    ))
+                fig6.add_hline(y=0, line_dash="dash", line_color="#94a3b8",
+                               annotation_text="No Acceleration", annotation_position="top right")
+                fig6.update_layout(
+                    template="plotly_dark",
+                    title="Epigenetic Age Acceleration Distribution by Phenotypic Group",
+                    yaxis_title="Age Acceleration (Years)",
+                    xaxis_title="Cohort Group",
+                    height=500,
+                    font=dict(family="Inter", size=13)
+                )
+                st.plotly_chart(fig6, use_container_width=True)
+            else:
+                st.info("Age Acceleration violin plot requires chronological ages to be provided and epigenetic clock estimation to be run.")
+                fig6 = None
+        with fig6_btn:
+            st.write("")
+            st.write("")
+            if clock_df.height > 0 and "age_acceleration" in clock_df.columns and fig6 is not None:
+                _png_download_button(fig6, "fig6_age_acceleration_violin.png")
+
+        # ─── Figure 7: DMR Lollipop Plot ──────────────────────────────
+        st.markdown("---")
+        st.markdown("### Figure 7 — DMR Lollipop Plot")
+        st.caption("Publication-standard display of top called DMRs. Lollipop height = effect size (mean Δβ). Red = hypermethylated, Blue = hypomethylated.")
+        fig7_col, fig7_btn = st.columns([5, 1])
+        with fig7_col:
+            if dmr_df.height > 0:
+                lollipop_pd = dmr_df.to_pandas().copy()
+                lollipop_pd["label"] = lollipop_pd["chrom"] + ":" + lollipop_pd["start"].astype(str)
+                lollipop_pd["size"] = lollipop_pd["num_sites"] * 4
+                lollipop_pd["color"] = lollipop_pd["mean_diff"].apply(
+                    lambda x: "#f43f5e" if x > 0 else "#38bdf8"
+                )
+                lollipop_pd = lollipop_pd.sort_values("mean_diff", key=abs, ascending=False).head(30)
+                fig7 = go.Figure()
+                # Stems
+                for _, row in lollipop_pd.iterrows():
+                    fig7.add_shape(
+                        type="line",
+                        x0=row["label"], x1=row["label"],
+                        y0=0, y1=row["mean_diff"],
+                        line=dict(color="#64748b", width=1.5)
+                    )
+                # Heads
+                fig7.add_trace(go.Scatter(
+                    x=lollipop_pd["label"],
+                    y=lollipop_pd["mean_diff"],
+                    mode="markers",
+                    marker=dict(
+                        color=lollipop_pd["color"],
+                        size=lollipop_pd["size"].clip(6, 24),
+                        line=dict(color="white", width=1)
+                    ),
+                    text=lollipop_pd.apply(
+                        lambda r: f"{r['label']}<br>Δβ={r['mean_diff']:.3f}<br>{r['num_sites']} CpGs", axis=1
+                    ),
+                    hovertemplate="%{text}<extra></extra>"
+                ))
+                fig7.add_hline(y=0, line_dash="solid", line_color="#94a3b8")
+                fig7.update_layout(
+                    template="plotly_dark",
+                    title="Top Called DMRs — Lollipop Plot (Red=Hyper, Blue=Hypo)",
+                    xaxis=dict(title="DMR Coordinate", tickangle=45, tickfont=dict(size=9)),
+                    yaxis_title="Mean Methylation Difference (Δβ)",
+                    height=550,
+                    showlegend=False,
+                    font=dict(family="Inter", size=13)
+                )
+                st.plotly_chart(fig7, use_container_width=True)
+            else:
+                st.info("DMR Lollipop plot requires called DMRs from differential methylation analysis.")
+                fig7 = None
+        with fig7_btn:
+            st.write("")
+            st.write("")
+            if dmr_df.height > 0 and fig7 is not None:
+                _png_download_button(fig7, "fig7_dmr_lollipop.png")
+
+        # ─── Figure 8: Cell-Type Composition Stacked Area ─────────────
+        st.markdown("---")
+        st.markdown("### Figure 8 — Immune Cell Composition Stacked Area Chart")
+        st.caption("Per-sample immune landscape as a continuous stacked area. Shows the relative contribution of each immune cell type across your cohort.")
+        fig8_col, fig8_btn = st.columns([5, 1])
+        with fig8_col:
+            if decon_df is not None:
+                decon_pd_area = decon_df.to_pandas()
+                cell_types_area = [c for c in decon_pd_area.columns if c != "sample"]
+                fig8 = go.Figure()
+                area_colors = px.colors.qualitative.Vivid
+                for idx_c, ct in enumerate(cell_types_area):
+                    fig8.add_trace(go.Scatter(
+                        x=decon_pd_area["sample"],
+                        y=decon_pd_area[ct],
+                        mode="lines+markers",
+                        name=ct,
+                        stackgroup="one",
+                        fillcolor=area_colors[idx_c % len(area_colors)],
+                        line=dict(width=0.8),
+                        hovertemplate=f"{ct}: %{{y:.1%}}<extra></extra>"
+                    ))
+                fig8.update_layout(
+                    template="plotly_dark",
+                    title="Per-Sample Immune Cell-Type Composition (Stacked Area)",
+                    xaxis_title="Sample",
+                    yaxis=dict(title="Cell-Type Proportion", tickformat=".0%", range=[0, 1]),
+                    legend_title="Cell Type",
+                    height=500,
+                    font=dict(family="Inter", size=13)
+                )
+                st.plotly_chart(fig8, use_container_width=True)
+            else:
+                st.info("Cell composition area chart requires cell-type deconvolution to be run.")
+                fig8 = None
+        with fig8_btn:
+            st.write("")
+            st.write("")
+            if decon_df is not None and fig8 is not None:
+                _png_download_button(fig8, "fig8_cell_composition_area.png")
+
+        st.markdown("---")
+        st.caption("💡 Tip: All figures use dark-mode Plotly. PNG exports are 1400×800px @2× scale — ready for journal submission.")
+
     with tab_ai:
         st.subheader("🤖 Autonomous AI Research Copilot")
         st.write(
@@ -1070,116 +1462,295 @@ if st.session_state.analyzed:
             generate_ai_report = st.button("🪄 Generate Literature Synthesis & Discussion", use_container_width=True)
             
         with ai_cols[1]:
-            st.markdown("### 📝 Generated Biological Synthesis")
-            if generate_ai_report:
-                with st.spinner("Synthesizing multi-omics parameters and drafting scientific discussion..."):
-                    from epichronos.ai import EpigeneticCopilot
+            ai_subtab_report, ai_subtab_chat = st.tabs(["📝 Discussion Report", "💬 Interactive Chat"])
+            
+            with ai_subtab_report:
+                st.markdown("### Generated Biological Synthesis")
+                if generate_ai_report:
+                    with st.spinner("Synthesizing multi-omics parameters and drafting scientific discussion..."):
+                        from epichronos.ai import EpigeneticCopilot
+                        
+                        enrich_df = st.session_state.enrich_df
+                        decon_df = st.session_state.decon_df
+                        
+                        report_text = EpigeneticCopilot.generate_discussion_draft(
+                            dataset=dataset,
+                            dmr_df=dmr_df,
+                            enrich_df=enrich_df,
+                            clock_df=clock_df,
+                            decon_df=decon_df,
+                            focus_area=ai_focus,
+                            api_key=openai_key if openai_key else None,
+                            base_url=openai_base,
+                            model_name=model_name,
+                            is_thinking_model=is_thinking
+                        )
+                        
+                        st.session_state.ai_report_text = report_text
+                        st.success("Draft generated successfully!")
+                        
+                if "ai_report_text" in st.session_state:
+                    st.markdown(st.session_state.ai_report_text, unsafe_allow_html=True)
                     
-                    enrich_df = st.session_state.enrich_df
-                    decon_df = st.session_state.decon_df
-                    
-                    report_text = EpigeneticCopilot.generate_discussion_draft(
-                        dataset=dataset,
-                        dmr_df=dmr_df,
-                        enrich_df=enrich_df,
-                        clock_df=clock_df,
-                        decon_df=decon_df,
-                        focus_area=ai_focus,
-                        api_key=openai_key if openai_key else None,
-                        base_url=openai_base,
-                        model_name=model_name,
-                        is_thinking_model=is_thinking
+                    # Download button
+                    st.download_button(
+                        label="📥 Download Discussion Markdown",
+                        data=st.session_state.ai_report_text,
+                        file_name="epichronos_discussion.md",
+                        mime="text/markdown",
+                        use_container_width=True
                     )
-                    
-                    st.session_state.ai_report_text = report_text
-                    st.success("Draft generated successfully!")
-                    
-            if "ai_report_text" in st.session_state:
-                st.markdown(st.session_state.ai_report_text, unsafe_allow_html=True)
+            
+            with ai_subtab_chat:
+                st.markdown("### Ask the AI Copilot")
+                if "ai_chat_messages" not in st.session_state:
+                    st.session_state.ai_chat_messages = []
                 
-                # Download button
-                st.download_button(
-                    label="💾 Download AI Research Discussion (MD)",
-                    data=st.session_state.ai_report_text,
-                    file_name="epichronos_ai_research_discussion.md",
-                    mime="text/markdown",
-                    use_container_width=True
-                )
-            else:
-                st.info("Click 'Generate Literature Synthesis & Discussion' on the left to begin.")
+                # Display chat messages from history
+                chat_container = st.container(height=400)
+                with chat_container:
+                    for message in st.session_state.ai_chat_messages:
+                        with st.chat_message(message["role"]):
+                            st.markdown(message["content"])
+
+                # React to user input
+                if prompt := st.chat_input("Ask about your epigenetic analysis..."):
+                    st.session_state.ai_chat_messages.append({"role": "user", "content": prompt})
+                    with chat_container:
+                        with st.chat_message("user"):
+                            st.markdown(prompt)
+                            
+                        with st.chat_message("assistant"):
+                            with st.spinner("Thinking..."):
+                                from epichronos.ai import EpigeneticCopilot
+                                response = EpigeneticCopilot.chat_completion(
+                                    messages=st.session_state.ai_chat_messages,
+                                    dataset=dataset,
+                                    dmr_df=dmr_df,
+                                    enrich_df=st.session_state.enrich_df,
+                                    clock_df=clock_df,
+                                    decon_df=st.session_state.decon_df,
+                                    api_key=openai_key if openai_key else None,
+                                    base_url=openai_base,
+                                    model_name=model_name,
+                                    is_thinking_model=is_thinking
+                                )
+                                st.markdown(response)
+                        st.session_state.ai_chat_messages.append({"role": "assistant", "content": response})
             
     with tab_export:
         st.subheader("📥 Download Analysis Artifacts")
         st.write("Export your fully aligned, normalized data matrices and compile interactive standalone reports:")
         
-        # Download aligned beta matrix
-        csv_beta = dataset.beta_df.to_pandas().to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="💾 Download Aligned Beta Matrix (CSV)",
-            data=csv_beta,
-            file_name="epichronos_aligned_betas.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
+        import io
+        import zipfile
+        import datetime
         
-        if dml_df.height > 0:
-            csv_dml = dml_df.to_pandas().to_csv(index=False).encode('utf-8')
+        # ─────────────────────────────────────────────────────────────
+        # Section 1: Individual CSV Downloads
+        # ─────────────────────────────────────────────────────────────
+        st.markdown("### 📄 Individual CSV Exports")
+        csv_col1, csv_col2 = st.columns(2)
+        
+        with csv_col1:
+            # Download aligned beta matrix
+            csv_beta = dataset.beta_df.to_pandas().to_csv(index=False).encode('utf-8')
             st.download_button(
-                label="💾 Download DML Loci Statistics (CSV)",
-                data=csv_dml,
-                file_name="epichronos_dml_results.csv",
+                label="💾 Aligned Beta Matrix (CSV)",
+                data=csv_beta,
+                file_name="epichronos_aligned_betas.csv",
                 mime="text/csv",
                 use_container_width=True
             )
             
-        enrich_df = st.session_state.enrich_df
-        if enrich_df is not None and enrich_df.height > 0:
-            csv_enrich = enrich_df.to_pandas().to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="💾 Download GO Pathway Enrichment Scores (CSV)",
-                data=csv_enrich,
-                file_name="epichronos_enrichment_results.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
+            if dml_df.height > 0:
+                csv_dml = dml_df.to_pandas().to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="💾 DML Loci Statistics (CSV)",
+                    data=csv_dml,
+                    file_name="epichronos_dml_results.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
             
-        # Download cell deconvolution results
-        if decon_df is not None:
-            csv_decon = decon_df.to_pandas().to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="💾 Download Immune Cell Proportions (CSV)",
-                data=csv_decon,
-                file_name="epichronos_cell_proportions.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
+            if dmr_df.height > 0:
+                csv_dmr = dmr_df.to_pandas().to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="💾 DMR Regions (CSV)",
+                    data=csv_dmr,
+                    file_name="epichronos_dmr_results.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
             
-        # Download IEAA results
-        if ieaa_df is not None:
-            csv_ieaa = ieaa_df.to_pandas().to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="💾 Download Intrinsic Epigenetic Age Acceleration (CSV)",
-                data=csv_ieaa,
-                file_name="epichronos_ieaa_results.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
-            
-        # Download meQTL results
-        if meqtl_df is not None and meqtl_df.height > 0:
-            csv_meqtl = meqtl_df.to_pandas().to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="💾 Download Mapped meQTL Correlations (CSV)",
-                data=csv_meqtl,
-                file_name="epichronos_meqtl_results.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
-            
-        # Standalone HTML report export
+            if clock_df.height > 0:
+                csv_clock = clock_df.to_pandas().to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="💾 Epigenetic Clock Ages (CSV)",
+                    data=csv_clock,
+                    file_name="epichronos_clock_ages.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+        
+        with csv_col2:
+            enrich_df = st.session_state.enrich_df
+            if enrich_df is not None and enrich_df.height > 0:
+                csv_enrich = enrich_df.to_pandas().to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="💾 GO Pathway Enrichment (CSV)",
+                    data=csv_enrich,
+                    file_name="epichronos_enrichment_results.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+                
+            if decon_df is not None:
+                csv_decon = decon_df.to_pandas().to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="💾 Immune Cell Proportions (CSV)",
+                    data=csv_decon,
+                    file_name="epichronos_cell_proportions.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+                
+            if ieaa_df is not None:
+                csv_ieaa = ieaa_df.to_pandas().to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="💾 Age Acceleration IEAA (CSV)",
+                    data=csv_ieaa,
+                    file_name="epichronos_ieaa_results.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+                
+            if meqtl_df is not None and meqtl_df.height > 0:
+                csv_meqtl = meqtl_df.to_pandas().to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="💾 meQTL Correlations (CSV)",
+                    data=csv_meqtl,
+                    file_name="epichronos_meqtl_results.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+        
+        # ─────────────────────────────────────────────────────────────
+        # Section 2: BED File Export (Genome Browser)
+        # ─────────────────────────────────────────────────────────────
         st.write("---")
-        st.markdown("### Compile Standalone HTML Dashboard Report")
-        st.write("Generate a portable, highly aesthetic standalone HTML dashboard report that works fully offline:")
+        st.markdown("### 🧬 BED File Export (Genome Browser)")
+        st.write("Load your DMRs directly into UCSC Genome Browser, IGV, or any BED-compatible viewer:")
+        
+        bed_col1, bed_col2 = st.columns(2)
+        
+        with bed_col1:
+            if dmr_df.height > 0:
+                bed_lines = ['track name="EpiChronos_DMRs" description="Differentially Methylated Regions" visibility=2 itemRgb="On"']
+                dmr_pd = dmr_df.to_pandas()
+                for _, row in dmr_pd.iterrows():
+                    chrom = row["chrom"]
+                    start = int(row["start"])
+                    end = int(row["end"])
+                    diff = row.get("mean_diff", 0)
+                    n_sites = int(row.get("num_sites", 1))
+                    score = min(1000, int(abs(diff) * 1000))
+                    # Red for hyper, Blue for hypo
+                    color = "255,0,0" if diff > 0 else "0,0,255"
+                    name = f"DMR_{chrom}_{start}_{n_sites}sites"
+                    bed_lines.append(f"{chrom}\t{start}\t{end}\t{name}\t{score}\t.\t{start}\t{end}\t{color}")
+                bed_data = "\n".join(bed_lines).encode("utf-8")
+                st.download_button(
+                    label="🧬 Download DMR BED File",
+                    data=bed_data,
+                    file_name="epichronos_dmrs.bed",
+                    mime="text/plain",
+                    use_container_width=True
+                )
+            else:
+                st.info("No DMRs called — BED export requires at least one significant region.")
+        
+        with bed_col2:
+            if dml_df.height > 0:
+                sig_dml = dml_df.filter(pl.col("p_value") <= 0.05)
+                if sig_dml.height > 0:
+                    bed_lines_dml = ['track name="EpiChronos_DMLs" description="Significant Differentially Methylated Loci" visibility=1 itemRgb="On"']
+                    sig_pd = sig_dml.to_pandas()
+                    for _, row in sig_pd.iterrows():
+                        chrom = row["chrom"]
+                        pos = int(row["pos"])
+                        diff = row.get("mean_diff", 0)
+                        score = min(1000, int(abs(diff) * 1000))
+                        color = "220,50,50" if diff > 0 else "50,50,220"
+                        bed_lines_dml.append(f"{chrom}\t{pos}\t{pos+1}\tDML_{chrom}_{pos}\t{score}\t.\t{pos}\t{pos+1}\t{color}")
+                    bed_dml_data = "\n".join(bed_lines_dml).encode("utf-8")
+                    st.download_button(
+                        label="🧬 Download Significant DML BED File",
+                        data=bed_dml_data,
+                        file_name="epichronos_significant_dmls.bed",
+                        mime="text/plain",
+                        use_container_width=True
+                    )
+        
+        # ─────────────────────────────────────────────────────────────
+        # Section 3: Excel Multi-Sheet Workbook
+        # ─────────────────────────────────────────────────────────────
+        st.write("---")
+        st.markdown("### 📊 Excel Workbook Export")
+        st.write("All results in a single `.xlsx` workbook with separate sheets — ready for collaborators:")
+        
+        try:
+            xlsx_buffer = io.BytesIO()
+            import pandas as pd
+            with pd.ExcelWriter(xlsx_buffer, engine="openpyxl") as writer:
+                dataset.beta_df.to_pandas().to_excel(writer, sheet_name="Beta_Matrix", index=False)
+                if dml_df.height > 0:
+                    dml_df.to_pandas().to_excel(writer, sheet_name="DML_Results", index=False)
+                if dmr_df.height > 0:
+                    dmr_df.to_pandas().to_excel(writer, sheet_name="DMR_Results", index=False)
+                if clock_df.height > 0:
+                    clock_df.to_pandas().to_excel(writer, sheet_name="Clock_Ages", index=False)
+                if enrich_df is not None and enrich_df.height > 0:
+                    enrich_df.to_pandas().to_excel(writer, sheet_name="Pathway_Enrichment", index=False)
+                if decon_df is not None:
+                    decon_df.to_pandas().to_excel(writer, sheet_name="Cell_Deconvolution", index=False)
+                if ieaa_df is not None:
+                    ieaa_df.to_pandas().to_excel(writer, sheet_name="IEAA_Acceleration", index=False)
+                if meqtl_df is not None and meqtl_df.height > 0:
+                    meqtl_df.to_pandas().to_excel(writer, sheet_name="meQTL_Correlations", index=False)
+                    
+                # Summary sheet
+                summary_data = {
+                    "Metric": [
+                        "Total CpG Sites", "Total Samples", "Significant DMLs (p<0.05)",
+                        "Called DMRs", "Clock Models Used", "Analysis Date"
+                    ],
+                    "Value": [
+                        str(dataset.shape[0]), str(len(dataset.samples)),
+                        str(dml_df.filter(pl.col("p_value") <= 0.05).height) if dml_df.height > 0 else "0",
+                        str(dmr_df.height), "Horvath + Hannum",
+                        datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                    ]
+                }
+                pd.DataFrame(summary_data).to_excel(writer, sheet_name="Summary", index=False)
+            
+            xlsx_buffer.seek(0)
+            st.download_button(
+                label="📊 Download Complete Excel Workbook (.xlsx)",
+                data=xlsx_buffer.getvalue(),
+                file_name="epichronos_complete_results.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+        except ImportError:
+            st.warning("Install `openpyxl` for Excel export: `pip install openpyxl`")
+        
+        # ─────────────────────────────────────────────────────────────
+        # Section 4: Standalone HTML Report
+        # ─────────────────────────────────────────────────────────────
+        st.write("---")
+        st.markdown("### 🖥️ Interactive HTML Dashboard Report")
+        st.write("A portable, fully offline standalone HTML dashboard with embedded Plotly charts:")
         
         temp_report = tempfile.NamedTemporaryFile(delete=False, suffix=".html")
         generate_report(
@@ -1199,9 +1770,105 @@ if st.session_state.analyzed:
             use_container_width=True
         )
         
+        # ─────────────────────────────────────────────────────────────
+        # Section 5: Download ALL as ZIP
+        # ─────────────────────────────────────────────────────────────
+        st.write("---")
+        st.markdown("### 📦 Download All Results (ZIP)")
+        st.write("One click — every CSV, BED file, Excel workbook, and HTML report bundled together:")
+        
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            # CSVs
+            zf.writestr("csv/aligned_betas.csv", dataset.beta_df.to_pandas().to_csv(index=False))
+            if dml_df.height > 0:
+                zf.writestr("csv/dml_results.csv", dml_df.to_pandas().to_csv(index=False))
+            if dmr_df.height > 0:
+                zf.writestr("csv/dmr_results.csv", dmr_df.to_pandas().to_csv(index=False))
+            if clock_df.height > 0:
+                zf.writestr("csv/clock_ages.csv", clock_df.to_pandas().to_csv(index=False))
+            if enrich_df is not None and enrich_df.height > 0:
+                zf.writestr("csv/enrichment_results.csv", enrich_df.to_pandas().to_csv(index=False))
+            if decon_df is not None:
+                zf.writestr("csv/cell_proportions.csv", decon_df.to_pandas().to_csv(index=False))
+            if ieaa_df is not None:
+                zf.writestr("csv/ieaa_results.csv", ieaa_df.to_pandas().to_csv(index=False))
+            if meqtl_df is not None and meqtl_df.height > 0:
+                zf.writestr("csv/meqtl_results.csv", meqtl_df.to_pandas().to_csv(index=False))
+            
+            # BED files
+            if dmr_df.height > 0:
+                bed_lines_zip = ['track name="EpiChronos_DMRs" description="Differentially Methylated Regions" visibility=2 itemRgb="On"']
+                for _, row in dmr_df.to_pandas().iterrows():
+                    chrom = row["chrom"]
+                    start = int(row["start"])
+                    end = int(row["end"])
+                    diff = row.get("mean_diff", 0)
+                    n_sites = int(row.get("num_sites", 1))
+                    score = min(1000, int(abs(diff) * 1000))
+                    color = "255,0,0" if diff > 0 else "0,0,255"
+                    bed_lines_zip.append(f"{chrom}\t{start}\t{end}\tDMR_{chrom}_{start}_{n_sites}sites\t{score}\t.\t{start}\t{end}\t{color}")
+                zf.writestr("bed/dmrs.bed", "\n".join(bed_lines_zip))
+            
+            # HTML report
+            zf.writestr("report/epichronos_dashboard.html", html_data)
+            
+            # Excel workbook
+            try:
+                xlsx_zip_buf = io.BytesIO()
+                import pandas as pd
+                with pd.ExcelWriter(xlsx_zip_buf, engine="openpyxl") as writer:
+                    dataset.beta_df.to_pandas().to_excel(writer, sheet_name="Beta_Matrix", index=False)
+                    if dml_df.height > 0:
+                        dml_df.to_pandas().to_excel(writer, sheet_name="DML_Results", index=False)
+                    if dmr_df.height > 0:
+                        dmr_df.to_pandas().to_excel(writer, sheet_name="DMR_Results", index=False)
+                    if clock_df.height > 0:
+                        clock_df.to_pandas().to_excel(writer, sheet_name="Clock_Ages", index=False)
+                    if decon_df is not None:
+                        decon_df.to_pandas().to_excel(writer, sheet_name="Cell_Deconvolution", index=False)
+                xlsx_zip_buf.seek(0)
+                zf.writestr("excel/epichronos_results.xlsx", xlsx_zip_buf.getvalue())
+            except ImportError:
+                pass
+            
+            # AI report (if generated)
+            if "ai_report_text" in st.session_state:
+                zf.writestr("report/ai_discussion_draft.md", st.session_state.ai_report_text)
+            
+            # README
+            readme_text = f"""# EpiChronos Analysis Results
+Generated: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+## Contents
+- csv/           — Individual result tables
+- bed/           — BED files for UCSC Genome Browser / IGV
+- excel/         — Complete Excel workbook with all sheets
+- report/        — Interactive HTML dashboard + AI discussion draft
+
+## Cohort Summary
+- CpG Sites: {dataset.shape[0]:,}
+- Samples: {len(dataset.samples)}
+- Groups: {', '.join(dataset.get_groups().keys())}
+
+## Software
+EpiChronos v0.1.0 — https://github.com/[username]/epichronos
+"""
+            zf.writestr("README.txt", readme_text)
+        
+        zip_buffer.seek(0)
+        st.download_button(
+            label="📦 Download ALL Results (ZIP)",
+            data=zip_buffer.getvalue(),
+            file_name=f"epichronos_results_{datetime.datetime.now().strftime('%Y%m%d')}.zip",
+            mime="application/zip",
+            use_container_width=True
+        )
+        
         # Clear/Reset button
         st.write("---")
         if st.button("🗑️ Reset and Load New Cohort"):
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
             st.rerun()
+

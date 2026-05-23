@@ -24,8 +24,8 @@
 To install EpiChronos in development mode:
 
 ```bash
-git clone https://github.com/developer/epichronos.git
-cd epichronos
+git clone https://github.com/Rashidmstar12/EpiChronos.git
+cd EpiChronos
 pip install -e .
 ```
 
