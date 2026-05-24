@@ -29,8 +29,9 @@ def integrate_expression_data(
     max_dist_bp: int = 100000
 ) -> pl.DataFrame:
     """
-    Integrate called DMRs with RNA-seq expression data by performing meQTL correlation 
-    analysis across cohort samples, flagging functional gene silencing/activation.
+    Integrate called DMRs with RNA-seq expression data by performing eQTM (expression 
+    quantitative trait methylation) correlation analysis across cohort samples, flagging 
+    functional gene silencing/activation.
     
     Args:
         dataset: The target MethylationDataset containing beta values.
@@ -40,7 +41,7 @@ def integrate_expression_data(
         max_dist_bp: Maximum physical distance to search for adjacent genes.
         
     Returns:
-        Polars DataFrame containing meQTL correlations and functional statuses.
+        Polars DataFrame containing eQTM correlations and functional statuses.
     """
     if dmr_df.height == 0 or expression_df.height == 0:
         return pl.DataFrame(schema={
