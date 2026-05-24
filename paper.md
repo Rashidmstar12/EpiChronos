@@ -23,7 +23,7 @@ bibliography: paper.bib
 
 # Statement of Need
 
-Bioinformatics workflows for DNA methylation frequently suffer from the "memory wall" of traditional R packages. Traditional R-Bioconductor tools such as bsseq and minfi can require substantial RAM when processing whole-genome bisulfite sequencing datasets of 25–30 million CpGs, creating barriers for researchers without access to high-memory servers. `EpiChronos` addresses this bottleneck by providing a native Python suite that aligns multi-platform coordinate datasets in contiguous Arrow memory buffers, enabling desktop-level processing of whole-genome profiles. Furthermore, `EpiChronos` bridges the gap between raw methylation values and downstream multi-omics interpretation by integrating epigenetic aging predictions, immune deconvolution, and transcriptomic linkages into a unified suite.
+Bioinformatics workflows for DNA methylation frequently suffer from the "memory wall" of traditional R packages. Traditional R-Bioconductor tools such as bsseq and minfi can require substantial RAM when processing whole-genome bisulfite sequencing datasets of 25–30 million CpGs, creating barriers for researchers without access to high-memory servers. For reference, processing a typical 450K array cohort (n=100, ~480,000 CpGs) in R using \`minfi\` requires >4 GB RAM, while EpiChronos processes 500,000 CpGs using only 61 MB. `EpiChronos` addresses this bottleneck by providing a native Python suite that aligns multi-platform coordinate datasets in contiguous Arrow memory buffers, enabling desktop-level processing of whole-genome profiles. Furthermore, `EpiChronos` bridges the gap between raw methylation values and downstream multi-omics interpretation by integrating epigenetic aging predictions, immune deconvolution, and transcriptomic linkages into a unified suite.
 
 # Mathematical & Implementation Foundations
 
@@ -39,7 +39,7 @@ $$t = \frac{\bar{X}_1 - \bar{X}_2}{\sqrt{\frac{s_1^2}{N_1} + \frac{s_2^2}{N_2}}}
 with Welch–Satterthwaite degrees of freedom $\nu$ dynamically computed for every locus. False Discovery Rate (FDR) corrections are applied using vectorized Benjamini–Hochberg procedures.
 
 ## Cell-Type Deconvolution & Epigenetic Clocks
-To isolate confounding cell-type shifts in heterogeneous tissue (such as peripheral blood), `EpiChronos` implements a constrained projection solver based on the Houseman algorithm [@Houseman2012DNAMA]. For a sample methylation vector $\mathbf{y}$ and reference matrix $\mathbf{M}$ compiled from purified blood cell fractions [@reinius2012differential], the cell-type weight vector $\mathbf{w}$ is estimated via constrained OLS using a precomputed Moore-Penrose pseudo-inverse of the Reinius et al. reference panel [@reinius2012differential]:
+To isolate confounding cell-type shifts in heterogeneous tissue (such as peripheral blood), `EpiChronos` implements a constrained projection solver based on the Houseman algorithm [@Houseman2012DNAMA]. For a sample methylation vector $\mathbf{y}$ and reference matrix $\mathbf{M}$ compiled from purified blood cell fractions [@reinius2012differential], the cell-type weight vector $\mathbf{w}$ is estimated via constrained OLS using a precomputed Moore-Penrose pseudo-inverse of the Reinius et al. reference panel:
 
 $$\min_{\mathbf{w}} \|\mathbf{y} - \mathbf{M}\mathbf{w}\|^2_2 \quad \text{subject to} \quad w_k \ge 0, \sum_k w_k = 1$$
 
