@@ -9,7 +9,7 @@ tags:
   - Polars
 authors:
   - name: Rashid M.
-    orcid: 0009-0004-9844-325X
+    orcid: 0009-0009-6398-4557
     affiliation: 1
 affiliations:
   - index: 1
