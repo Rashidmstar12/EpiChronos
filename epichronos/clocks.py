@@ -5,6 +5,12 @@ import os
 from typing import Dict, List, Tuple, Union, Optional
 from epichronos.core import MethylationDataset
 
+# Enforce pyliftover as a hard dependency for coordinate-level liftovers
+try:
+    from pyliftover import LiftOver
+except ImportError as e:
+    raise ImportError("EpiChronos requires the 'pyliftover' package. Please install it using: pip install pyliftover") from e
+
 def _load_model(name: str) -> dict:
     """Helper to load model JSON from resources."""
     base_dir = os.path.dirname(__file__)
@@ -133,61 +139,42 @@ def calculate_biological_age(
     is_hg38 = False
     lo_19_to_38 = None
     
-    # Pre-defined GRCh38 mock positions for dynamic fallback
-    fallback_mock_hg38 = {
-        "cg00000029": ("chr16", 53434600),
-        "cg00000292": ("chr16", 28881200),
-        "cg00002426": ("chr3", 57712300),
-        "cg00003858": ("chr1", 15611200),
-        "cg02242131": ("chr1", 20412300),
-        "cg08945781": ("chr2", 45712300),
-        "cg06493994": ("chr3", 102412300),
-        "cg09809672": ("chr4", 89412300),
-        "cg22730898": ("chr5", 152112300),
-        "cg01820374": ("chr6", 32412300),
-        "cg19766904": ("chr7", 105612300),
-        "cg04874057": ("chr8", 22412300),
-        "cg16867657": ("chr9", 139412300),
-        "cg19854823": ("chr10", 72412300),
-    }
-    
-    # If no matches in GRCh37/hg19, check if we match any of the GRCh38 fallback mock positions
+    # If no matches in GRCh37/hg19, check if they align with the hg38 coordinates using pyliftover
     if grch37_matches == 0 and total_checks > 0:
-        hg38_mock_matches = 0
-        for probe, coords in fallback_mock_hg38.items():
-            chrom, pos = coords
-            if (chrom, pos) in coord_map or (chrom, pos + 1) in coord_map or (chrom, pos - 1) in coord_map:
-                hg38_mock_matches += 1
-        
-        if hg38_mock_matches > 0:
-            is_hg38 = True
-        else:
-            # Check if we can import pyliftover and if it detects GRCh38
-            try:
-                from pyliftover import LiftOver
-                lo_19_to_38 = LiftOver('hg19', 'hg38')
-                # Check if lifted positions of some manifest probes match coordinates in df
-                lift_matches = 0
-                for probe in list(weights.keys())[:20]:
-                    if probe in CLOCK_MANIFEST:
-                        chrom, pos = CLOCK_MANIFEST[probe]
-                        lifted = lo_19_to_38.convert_coordinate(chrom, pos)
-                        if lifted:
-                            lc, lp = lifted[0][0], lifted[0][1]
-                            if (lc, lp) in coord_map or (lc, lp + 1) in coord_map or (lc, lp - 1) in coord_map:
-                                lift_matches += 1
-                if lift_matches > 0:
-                    is_hg38 = True
-            except Exception:
-                pass
-                
-    # Initialize LiftOver if detected hg38
-    if is_hg38 and lo_19_to_38 is None:
         try:
-            from pyliftover import LiftOver
             lo_19_to_38 = LiftOver('hg19', 'hg38')
+            # Check if lifted positions of some manifest probes match coordinates in df
+            lift_matches = 0
+            for probe in list(weights.keys())[:20]:
+                if probe in CLOCK_MANIFEST:
+                    chrom, pos = CLOCK_MANIFEST[probe]
+                    lifted = lo_19_to_38.convert_coordinate(chrom, pos)
+                    if lifted:
+                        lc, lp = lifted[0][0], lifted[0][1]
+                        if (lc, lp) in coord_map or (lc, lp + 1) in coord_map or (lc, lp - 1) in coord_map:
+                            lift_matches += 1
+            if lift_matches > 0:
+                is_hg38 = True
         except Exception:
             pass
+            
+    # Initialize LiftOver if detected hg38
+    if is_hg38:
+        print("Assembly Detection: Input dataset coordinates appear to be GRCh38/hg38. Initializing Liftover.")
+        if lo_19_to_38 is None:
+            try:
+                lo_19_to_38 = LiftOver('hg19', 'hg38')
+            except Exception as e:
+                raise RuntimeError(
+                    "Input dataset coordinates appear to be GRCh38/hg38, but the pyliftover hg19->hg38 chain file "
+                    "could not be loaded. To avoid silent calculation errors, please check your network connection "
+                    "or supply a GRCh37 coordinate-aligned dataset."
+                ) from e
+                
+        if lo_19_to_38 is None:
+            raise RuntimeError(
+                "Input dataset coordinates appear to be GRCh38/hg38, but pyliftover is unavailable or failed to initialize."
+            )
 
     for probe in weights:
         if probe in CLOCK_MANIFEST:
@@ -195,12 +182,14 @@ def calculate_biological_age(
             
             # Dynamically lift over hg19 coordinate to hg38 if needed
             if is_hg38:
-                if lo_19_to_38:
-                    lifted = lo_19_to_38.convert_coordinate(chrom, pos)
-                    if lifted:
-                        chrom, pos = lifted[0][0], lifted[0][1]
-                elif probe in fallback_mock_hg38:
-                    chrom, pos = fallback_mock_hg38[probe]
+                lifted = lo_19_to_38.convert_coordinate(chrom, pos)
+                if lifted:
+                    chrom, pos = lifted[0][0], lifted[0][1]
+                else:
+                    raise ValueError(
+                        f"Failed to lift over Clock CpG '{probe}' coordinate ({chrom}:{pos}) to GRCh38. "
+                        "To prevent incorrect biological age calculations, execution has been stopped."
+                    )
             
             # Find the row index using the Watson/Crick strand-aware jitter tolerance (exact, +1 bp, -1 bp)
             row_idx = None

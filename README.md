@@ -12,9 +12,10 @@
 
 *   **Unified Multi-Platform Support**: Read and align standard Bismark `.cov` sequencing files, array-based beta matrices, and coordinate datasets seamlessly into a common coordinate-centric format.
 *   **Order-of-Magnitude Performance Gains**: Leverage a fully multi-threaded **Polars** data engine to run DML/DMR calling on millions of cytosines in seconds, bypassing the R-Bioconductor memory wall.
-*   **Vectorized Welch's t-test**: Fast statistical comparisons between phenotypic cohorts using highly parallelized matrix algebra.
-*   **Epigenetic Aging Clock Engine**: Built-in implementations of Horvath's multi-tissue clock and Hannum's clock, supporting automatic mapping from genomic coordinates to array probe IDs.
+*   **Vectorized Welch's t-test with Welch–Satterthwaite df**: High-fidelity statistical comparisons between phenotypic cohorts using highly parallelized matrix algebra and rigorous degrees of freedom to avoid pooled-variance errors.
+*   **Assembly-Aware Epigenetic Aging Clocks**: Built-in Horvath, Hannum, and Pacemaker clock calculations with dynamic coordinate liftover mapping (GRCh37/GRCh38) powered by `pyliftover` to prevent silent coordinate mismatches.
 *   **Robust Missing-Value Imputation**: High-fidelity cohort-mean and standard public reference-mean imputation for missing CpGs in sparse sequencing samples, resolving a major bottleneck where missing sites cause clock calculations to crash.
+*   **Hypergeometric Pathway Enrichment (MSigDB Hallmarks)**: High-speed overrepresentation analysis using Legally compliant, CC BY 4.0 licensed MSigDB Hallmark gene sets.
 *   **Interactive Standalone HTML Reports**: Compile quality control, global PCA projections, Volcano plots of differentially methylated loci (DMLs), and epigenetic age acceleration graphs into a single shareable interactive dashboard.
 
 ---
@@ -36,6 +37,7 @@ EpiChronos is built to be extremely lightweight and requires only:
 *   `scipy >= 1.10.0` (for statistical distributions)
 *   `plotly >= 5.14.0` (for interactive visualization)
 *   `pyarrow >= 12.0.0` (for Arrow memory management)
+*   `pyliftover >= 0.6.1` (for dynamic assembly liftover translation)
 
 ---
 
