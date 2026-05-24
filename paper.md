@@ -13,7 +13,7 @@ authors:
     affiliation: 1
 affiliations:
   - index: 1
-    name: Department of Bioinformatics, Pondicherry University, Puducherry, India
+    name: Department of Biotechnology, Pondicherry University, Puducherry, India
 date: 24 May 2026
 bibliography: paper.bib
 ---
