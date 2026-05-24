@@ -100,7 +100,7 @@ def annotate_dmrs_to_genes(
 
 def perform_pathway_enrichment(
     target_genes: List[str],
-    genome_background_size: int = 20000
+    genome_background_size: int = len(GENE_MANIFEST)
 ) -> pl.DataFrame:
     """
     Perform high-speed hypergeometric overrepresentation analysis (ORA) 
