@@ -9,6 +9,8 @@ class EpigeneticPacemaker:
     Utilizes an alternating coordinate-descent algorithm to capture non-linear
     aging trajectories across individual CpG sites without assuming linear relationships
     with chronological age.
+    
+    Algorithm based on the Epigenetic Pacemaker model described in Snir et al. (2016) PLOS Computational Biology, doi:10.1371/journal.pcbi.1004913
     """
     def __init__(self, max_iter: int = 150, tol: float = 1e-5):
         """
