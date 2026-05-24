@@ -5,13 +5,13 @@ from epichronos.core import MethylationDataset
 from epichronos.transcription import integrate_expression_data
 
 def test_transcription_integration():
-    # Make a mock dataset with a called DMR inside chr2:460000-465000 (NFKB1 vicinity)
+    # Make a mock dataset with a called DMR inside chr4:103422515-103538459 (NFKB1 vicinity)
     samples = ["Ctrl_1", "Ctrl_2", "Ctrl_3", "Treat_1", "Treat_2", "Treat_3"]
     
     # 3 CpGs inside the DMR
     beta_df = pl.DataFrame({
-        "chrom": ["chr2", "chr2", "chr2"],
-        "pos": [461000, 462000, 463000],
+        "chrom": ["chr4", "chr4", "chr4"],
+        "pos": [103425000, 103426000, 103427000],
         "Ctrl_1": [0.8, 0.9, 0.85],
         "Ctrl_2": [0.75, 0.8, 0.85],
         "Ctrl_3": [0.85, 0.85, 0.9],
@@ -24,9 +24,9 @@ def test_transcription_integration():
     
     # Define a mock called DMR
     dmr_df = pl.DataFrame({
-        "chrom": ["chr2"],
-        "start": [460500],
-        "end": [464500],
+        "chrom": ["chr4"],
+        "start": [103424000],
+        "end": [103428000],
         "num_sites": [3],
         "mean_diff": [-0.65],
         "area": [-2.6]
@@ -50,7 +50,7 @@ def test_transcription_integration():
     
     # Validate structure and values
     assert meqtl_df.height == 1
-    assert meqtl_df["chrom"][0] == "chr2"
+    assert meqtl_df["chrom"][0] == "chr4"
     assert meqtl_df["gene"][0] == "NFKB1"
     
     # Pearson correlation r must be highly negative

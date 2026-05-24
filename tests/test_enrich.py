@@ -3,12 +3,12 @@ import polars as pl
 from epichronos.enrich import annotate_dmrs_to_genes, perform_pathway_enrichment, GENE_MANIFEST
 
 def test_annotate_dmrs_to_genes():
-    # Setup mock DMR that resides directly in NFKB1 coordinate region on chr2
-    # NFKB1 is chr2:460000-470000
+    # Setup mock DMR that resides directly in NFKB1 coordinate region on chr4
+    # NFKB1 is chr4:103422515-103538459
     dmr_df = pl.DataFrame({
-        "chrom": ["chr2"],
-        "start": [462000],
-        "end": [464000],
+        "chrom": ["chr4"],
+        "start": [103430000],
+        "end": [103440000],
         "num_sites": [4],
         "mean_diff": [0.60],
         "min_p_value": [0.001],
@@ -17,9 +17,10 @@ def test_annotate_dmrs_to_genes():
     
     annotated = annotate_dmrs_to_genes(dmr_df, max_dist_bp=10000)
     
-    assert annotated.height == 1
-    assert annotated["gene"][0] == "NFKB1"
-    assert annotated["distance"][0] == 0  # Direct overlap
+    assert annotated.height >= 1
+    nfkb1_row = annotated.filter(pl.col("gene") == "NFKB1")
+    assert nfkb1_row.height == 1
+    assert nfkb1_row["distance"][0] == 0  # Direct overlap
 
 
 def test_perform_pathway_enrichment():
