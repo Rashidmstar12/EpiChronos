@@ -33,20 +33,27 @@ Bioinformatics workflows for DNA methylation frequently suffer from the "memory 
 Rather than relying on legacy row-oriented Python objects, `EpiChronos` utilizes a Rust-backed columnar Polars engine. Cytosine methylation data are stored in contiguous Apache Arrow memory buffers, allowing vectorized computation of differential methylation. 
 
 For cohort comparisons, `EpiChronos` implements a vectorized Welch's $t$-test with Satterthwaite degrees of freedom that calculates site-specific statistics without assuming equal variances. The test statistic $t$ for each CpG site is defined as:
+
 $$t = \frac{\bar{X}_1 - \bar{X}_2}{\sqrt{\frac{s_1^2}{N_1} + \frac{s_2^2}{N_2}}}$$
+
 with Welch–Satterthwaite degrees of freedom $\nu$ dynamically computed for every locus. False Discovery Rate (FDR) corrections are applied using vectorized Benjamini–Hochberg procedures.
 
 ## Cell-Type Deconvolution & Epigenetic Clocks
 To isolate confounding cell-type shifts in heterogeneous tissue (such as peripheral blood), `EpiChronos` implements a constrained projection solver based on the Houseman algorithm [@Houseman2012DNAMA]. For a sample methylation vector $\mathbf{y}$ and reference matrix $\mathbf{M}$ compiled from purified blood cell fractions [@reinius2012differential], the cell-type weight vector $\mathbf{w}$ is estimated via constrained OLS using a precomputed Moore-Penrose pseudo-inverse of the Reinius et al. reference panel [@reinius2012differential]:
+
 $$\min_{\mathbf{w}} \|\mathbf{y} - \mathbf{M}\mathbf{w}\|^2_2 \quad \text{subject to} \quad w_k \ge 0, \sum_k w_k = 1$$
 
 Biological age is predicted using assembly-aware Horvath [@horvath2013dna] and Hannum [@Hannum2013GenomewideMP] clocks with optional GRCh38 coordinate translation via pyliftover. For non-linear aging dynamics, we implement the Epigenetic Pacemaker (EPM) framework [@snir2016statistical], which models the methylation state $\hat{y}_{ij}$ of CpG site $j$ in sample $i$ using alternating coordinate descent to solve:
+
 $$\hat{y}_{ij} = f(t_i; \mathbf{a}_j)$$
+
 where $t_i$ represents the epigenetic state of sample $i$, and $\mathbf{a}_j$ represents site-specific parameters.
 
 ## Multi-Omics Transcription Linkage (eQTM) & Pathway ORA
 `EpiChronos` bridges epigenetics and transcriptomics through expression quantitative trait methylation (eQTM) analysis. The library correlates called Differentially Methylated Regions (DMRs) with matching sample RNA-seq expression vectors to assess functional status (such as promoter hypermethylation leading to gene silencing). Downstream pathways are analyzed via Hypergeometric Overrepresentation Analysis (ORA) against MSigDB Hallmark gene sets [@Liberzon2015] using:
+
 $$P(X \ge k) = \sum_{i=k}^{n} \frac{\binom{K}{i} \binom{N-K}{n-i}}{\binom{N}{n}}$$
+
 where $N$ is the total size of the RefSeq coordinates database, $K$ is the size of the pathway gene set, $n$ is the number of target genes, and $k$ is the overlap size.
 
 # Computational Performance
