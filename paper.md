@@ -23,7 +23,7 @@ bibliography: paper.bib
 
 # Statement of Need
 
-Bioinformatics workflows for DNA methylation frequently suffer from the "memory wall" of traditional R packages (such as `minfi` or `bsseq`), where fragmented boxed S4 objects require large, expensive RAM configurations. As genome-scale cohorts grow—incorporating Whole Genome Bisulfite Sequencing (WGBS), Oxford Nanopore, and PacBio datasets—traditional R pipelines frequently hit out-of-memory limits on consumer hardware. `EpiChronos` addresses this bottleneck by providing a native Python suite that aligns multi-platform coordinate datasets in contiguous Arrow memory buffers, enabling desktop-level processing of whole-genome profiles. Furthermore, `EpiChronos` bridges the gap between raw methylation values and downstream multi-omics interpretation by integrating epigenetic aging predictions, immune deconvolution, and transcriptomic linkages into a unified suite.
+Bioinformatics workflows for DNA methylation frequently suffer from the "memory wall" of traditional R packages. Traditional R-Bioconductor tools such as bsseq and minfi can require substantial RAM when processing whole-genome bisulfite sequencing datasets of 25–30 million CpGs, creating barriers for researchers without access to high-memory servers. `EpiChronos` addresses this bottleneck by providing a native Python suite that aligns multi-platform coordinate datasets in contiguous Arrow memory buffers, enabling desktop-level processing of whole-genome profiles. Furthermore, `EpiChronos` bridges the gap between raw methylation values and downstream multi-omics interpretation by integrating epigenetic aging predictions, immune deconvolution, and transcriptomic linkages into a unified suite.
 
 # Mathematical & Implementation Foundations
 
@@ -32,15 +32,15 @@ Bioinformatics workflows for DNA methylation frequently suffer from the "memory 
 ## Data Engine & Vectorized Differential Methylation
 Rather than relying on legacy row-oriented Python objects, `EpiChronos` utilizes a Rust-backed columnar Polars engine. Cytosine methylation data are stored in contiguous Apache Arrow memory buffers, allowing vectorized computation of differential methylation. 
 
-For cohort comparisons, `EpiChronos` implements a vectorized Welch's $t$-test that calculates site-specific statistics without assuming equal variances. The test statistic $t$ for each CpG site is defined as:
+For cohort comparisons, `EpiChronos` implements a vectorized Welch's $t$-test with Satterthwaite degrees of freedom that calculates site-specific statistics without assuming equal variances. The test statistic $t$ for each CpG site is defined as:
 $$t = \frac{\bar{X}_1 - \bar{X}_2}{\sqrt{\frac{s_1^2}{N_1} + \frac{s_2^2}{N_2}}}$$
 with Welch–Satterthwaite degrees of freedom $\nu$ dynamically computed for every locus. False Discovery Rate (FDR) corrections are applied using vectorized Benjamini–Hochberg procedures.
 
 ## Cell-Type Deconvolution & Epigenetic Clocks
-To isolate confounding cell-type shifts in heterogeneous tissue (such as peripheral blood), `EpiChronos` implements a constrained projection solver based on the Houseman algorithm [@Houseman2012DNAMA]. For a sample methylation vector $\mathbf{y}$ and reference matrix $\mathbf{M}$ compiled from purified blood cell fractions [@reinius2012differential], the cell-type weight vector $\mathbf{w}$ is estimated via quadratic programming:
+To isolate confounding cell-type shifts in heterogeneous tissue (such as peripheral blood), `EpiChronos` implements a constrained projection solver based on the Houseman algorithm [@Houseman2012DNAMA]. For a sample methylation vector $\mathbf{y}$ and reference matrix $\mathbf{M}$ compiled from purified blood cell fractions [@reinius2012differential], the cell-type weight vector $\mathbf{w}$ is estimated via constrained OLS using a precomputed Moore-Penrose pseudo-inverse of the Reinius et al. reference panel [@reinius2012differential]:
 $$\min_{\mathbf{w}} \|\mathbf{y} - \mathbf{M}\mathbf{w}\|^2_2 \quad \text{subject to} \quad w_k \ge 0, \sum_k w_k = 1$$
 
-Biological age is predicted using assembly-aware Horvath [@horvath2013dna] and Hannum [@Hannum2013GenomewideMP] clocks with dynamic coordinate liftover. For non-linear aging dynamics, we implement the Epigenetic Pacemaker (EPM) framework [@snir2016statistical], which models the methylation state $\hat{y}_{ij}$ of CpG site $j$ in sample $i$ using alternating coordinate descent to solve:
+Biological age is predicted using assembly-aware Horvath [@horvath2013dna] and Hannum [@Hannum2013GenomewideMP] clocks with optional GRCh38 coordinate translation via pyliftover. For non-linear aging dynamics, we implement the Epigenetic Pacemaker (EPM) framework [@snir2016statistical], which models the methylation state $\hat{y}_{ij}$ of CpG site $j$ in sample $i$ using alternating coordinate descent to solve:
 $$\hat{y}_{ij} = f(t_i; \mathbf{a}_j)$$
 where $t_i$ represents the epigenetic state of sample $i$, and $\mathbf{a}_j$ represents site-specific parameters.
 
@@ -51,6 +51,6 @@ where $N$ is the total size of the RefSeq coordinates database, $K$ is the size 
 
 # Computational Performance
 
-`EpiChronos` eliminates the memory boxing overhead of Python objects and R garbage collection. Standard benchmarks demonstrate its high computational efficiency: loading, aligning, and executing downstream $t$-test analysis across a cohort of 500,000 CpG sites requires only **0.28 seconds** and has a peak RAM footprint of just **61 MB** on a standard consumer laptop. This represents an order-of-magnitude reduction in hardware requirements compared to equivalent R-Bioconductor workflows.
+On a consumer Windows machine (Python 3.12, Polars 1.41.0), `EpiChronos` processes 500,000 CpG sites across 6 samples in 0.28 ± 0.03 seconds using 61 MB of peak RAM. The reproducible benchmark script is available at scripts/benchmark_dml.py.
 
 # References
