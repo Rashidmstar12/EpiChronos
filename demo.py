@@ -15,6 +15,14 @@ def create_synthetic_data(data_dir: str):
     """
     os.makedirs(data_dir, exist_ok=True)
     
+    import json
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(base_dir, "epichronos", "resources", "horvath_model.json")
+    with open(model_path, "r", encoding="utf-8") as f:
+        model = json.load(f)
+    ref_means = model["reference_means"]
+    weights = model["weights"]
+    
     samples = ["Ctrl_1", "Ctrl_2", "Ctrl_3", "Treat_1", "Treat_2", "Treat_3"]
     ages = {"Ctrl_1": 25.0, "Ctrl_2": 32.0, "Ctrl_3": 38.0, "Treat_1": 56.0, "Treat_2": 62.0, "Treat_3": 68.0}
     groups = {"Ctrl_1": "Young", "Ctrl_2": "Young", "Ctrl_3": "Young", "Treat_1": "Old", "Treat_2": "Old", "Treat_3": "Old"}
@@ -66,21 +74,13 @@ def create_synthetic_data(data_dir: str):
                         break
                         
                 if matched_probe:
-                    # Inject biological clock signal: methylation correlates with age!
-                    # Example: cg02242131 (Horvath weight +0.15): increases with age
-                    # Example: cg09809672 (Horvath weight -0.18): decreases with age
-                    if matched_probe == "cg02242131":
-                        beta = 0.2 + 0.007 * age + np.random.normal(0, 0.02)
-                    elif matched_probe == "cg09809672":
-                        beta = 0.8 - 0.008 * age + np.random.normal(0, 0.02)
-                    elif matched_probe == "cg00000292":
-                        beta = 0.3 + 0.005 * age + np.random.normal(0, 0.02)
-                    elif matched_probe == "cg00002426":
-                        beta = 0.6 - 0.006 * age + np.random.normal(0, 0.02)
-                    elif matched_probe == "cg06493994":
-                        beta = 0.4 + 0.005 * age + np.random.normal(0, 0.02)
-                    else:
-                        beta = 0.5 + np.random.normal(0, 0.05)
+                    # Inject biological clock signal: baseline reference mean + weight-scaled age perturbation
+                    ref_val = ref_means.get(matched_probe, 0.5)
+                    weight = weights.get(matched_probe, 0.0)
+                    
+                    # Calibrated slope and offset parameters yielding perfect biological age correlation
+                    perturbation = weight * (0.0007 * age + 0.02)
+                    beta = ref_val + perturbation + np.random.normal(0, 0.015)
                 elif chrom == "chr2" and 450000 <= pos <= 500000:
                     # Inject a Differentially Methylated Region (DMR) on chr2!
                     # Treatment (Old) is hypermethylated compared to Control (Young)

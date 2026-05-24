@@ -371,7 +371,7 @@ def load_bismark_coverage(
     # Perform sequential outer joins to align all samples by chrom and pos
     combined = lazy_dfs[0]
     for next_df in lazy_dfs[1:]:
-        combined = combined.join(next_df, on=["chrom", "pos"], how="outer")
+        combined = combined.join(next_df, on=["chrom", "pos"], how="outer", coalesce=True)
         
     # Trigger computation
     df = combined.collect()
@@ -573,7 +573,7 @@ def load_nanopore_modkit(
     # Perform sequential outer joins to align all samples by chrom and pos
     combined = lazy_dfs[0]
     for next_df in lazy_dfs[1:]:
-        combined = combined.join(next_df, on=["chrom", "pos"], how="outer")
+        combined = combined.join(next_df, on=["chrom", "pos"], how="outer", coalesce=True)
         
     # Trigger computation
     df = combined.collect()
@@ -660,7 +660,7 @@ def load_pacbio_bedgraph(
     # Perform sequential outer joins to align all samples by chrom and pos
     combined = lazy_dfs[0]
     for next_df in lazy_dfs[1:]:
-        combined = combined.join(next_df, on=["chrom", "pos"], how="outer")
+        combined = combined.join(next_df, on=["chrom", "pos"], how="outer", coalesce=True)
         
     # Trigger computation
     df = combined.collect()
