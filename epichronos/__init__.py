@@ -2,7 +2,7 @@
 EpiChronos: A High-Performance, Unified Downstream DNA Methylation & Biological Aging Analysis Suite.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.1.0"
 
 from epichronos.core import (
     MethylationDataset, 
