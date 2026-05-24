@@ -8,7 +8,7 @@ tags:
   - Epigenetic Clock
   - Polars
 authors:
-  - name: Rashid M.
+  - name: Rashid Kadayil
     orcid: 0009-0009-6398-4557
     affiliation: 1
 affiliations:
