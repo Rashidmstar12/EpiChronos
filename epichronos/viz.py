@@ -3,7 +3,7 @@ import numpy as np
 import os
 import json
 from typing import Dict, List, Tuple, Union, Optional
-from plotly.offline import plot
+from plotly.offline import plot, get_plotlyjs
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -326,18 +326,25 @@ def generate_report(
     top_dmrs = dmr_df.sort(pl.col("area").abs(), descending=True).head(5).to_dicts()
     top_clocks = clock_df.to_dicts()
 
+    # Load offline bundled Plotly JS and Tailwind CSS
+    plotly_js_content = get_plotlyjs()
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    tailwind_path = os.path.join(base_dir, "resources", "tailwind.min.js")
+    with open(tailwind_path, "r", encoding="utf-8") as tf:
+        tailwind_js_content = tf.read()
+
     html_content = f"""<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EpiChronos Epigenomics Analysis Report</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS (Offline Bundled) -->
+    <script type="text/javascript">{tailwind_js_content}</script>
     <!-- Google Fonts Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Plotly Core JS from CDN -->
-    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <!-- Plotly Core JS (Offline Bundled) -->
+    <script type="text/javascript">{plotly_js_content}</script>
     <style>
         body {{
             font-family: 'Inter', sans-serif;
