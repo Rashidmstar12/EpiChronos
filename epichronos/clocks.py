@@ -5,11 +5,11 @@ import os
 from typing import Dict, List, Tuple, Union, Optional
 from epichronos.core import MethylationDataset
 
-# Enforce pyliftover as a hard dependency for coordinate-level liftovers
+# Try to import LiftOver for hg38 coordinates liftover
 try:
     from pyliftover import LiftOver
-except ImportError as e:
-    raise ImportError("EpiChronos requires the 'pyliftover' package. Please install it using: pip install pyliftover") from e
+except ImportError:
+    LiftOver = None
 
 def _load_model(name: str) -> dict:
     """Helper to load model JSON from resources."""
@@ -141,6 +141,10 @@ def calculate_biological_age(
     
     # If no matches in GRCh37/hg19, check if they align with the hg38 coordinates using pyliftover
     if grch37_matches == 0 and total_checks > 0:
+        if LiftOver is None:
+            raise ImportError(
+                "hg38 input detected. Please install pyliftover: pip install pyliftover"
+            )
         try:
             lo_19_to_38 = LiftOver('hg19', 'hg38')
             # Check if lifted positions of some manifest probes match coordinates in df
@@ -162,6 +166,10 @@ def calculate_biological_age(
     if is_hg38:
         print("Assembly Detection: Input dataset coordinates appear to be GRCh38/hg38. Initializing Liftover.")
         if lo_19_to_38 is None:
+            if LiftOver is None:
+                raise ImportError(
+                    "hg38 input detected. Please install pyliftover: pip install pyliftover"
+                )
             try:
                 lo_19_to_38 = LiftOver('hg19', 'hg38')
             except Exception as e:
