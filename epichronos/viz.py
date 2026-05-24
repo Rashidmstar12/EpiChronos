@@ -341,13 +341,11 @@ def generate_report(
     <title>EpiChronos Epigenomics Analysis Report</title>
     <!-- Tailwind CSS (Offline Bundled) -->
     <script type="text/javascript">{tailwind_js_content}</script>
-    <!-- Google Fonts Inter -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Plotly Core JS (Offline Bundled) -->
     <script type="text/javascript">{plotly_js_content}</script>
     <style>
         body {{
-            font-family: 'Inter', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
             background-color: #0f172a;
             color: #f8fafc;
         }}
