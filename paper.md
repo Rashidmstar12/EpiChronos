@@ -68,7 +68,8 @@ EpiChronos v0.1.2 was validated across four independent benchmarks:
 **Performance:** At 3 million CpGs (WGBS whole-genome scale), EpiChronos required
 367.7 MB RAM and completed in 5.86 seconds, representing a **27.3× reduction in
 memory** and **64.8× improvement in speed** compared to bsseq/R pipelines
-(Park & Wu, 2016; Hansen et al., 2012).
+(Park & Wu, 2016; Hansen et al., 2012). These scalability profiles are 
+illustrated in \autoref{fig:benchmark}.
 
 **Statistical accuracy:** On a controlled ground-truth dataset (2,000 true DMLs
 in 52,000 CpG background, n=6/group), EpiChronos achieved sensitivity=0.9975,
@@ -83,5 +84,7 @@ achieved Pearson r=0.918 and r=0.913 respectively against chronological age
 **Scalability:** EpiChronos scales linearly from 100K to 5M+ CpGs
 (12.2 MB → 614.2 MB RAM) without memory fragmentation, confirmed on
 simulated WGBS-scale datasets representing the full hg19 CpG landscape.
+
+![EpiChronos computational resource scaling compared to traditional R pipelines (bsseq/R) across various CpG density dimensions. Left: peak RAM consumption (MB), highlighting up to 35× memory reduction. Right: execution timeline (seconds), showing up to 72× speed improvement. Fold improvements are annotated. \label{fig:benchmark}](realdata/benchmark_performance.png)
 
 # References
