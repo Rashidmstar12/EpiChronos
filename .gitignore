@@ -30,6 +30,8 @@ pyaging_data/
 *.cov
 *.docx
 *biorxiv*
+realdata/clock_accuracy_correlation.png
+realdata/statistical_concordance_benchmarks.png
 
 # EXCEPT key package resources and validation results!
 !epichronos/resources/*.json
