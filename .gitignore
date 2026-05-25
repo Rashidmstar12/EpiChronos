@@ -29,6 +29,7 @@ pyaging_data/
 *.json
 *.cov
 *.docx
+*biorxiv*
 
 # EXCEPT key package resources and validation results!
 !epichronos/resources/*.json
