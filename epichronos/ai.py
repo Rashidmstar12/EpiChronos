@@ -8,10 +8,29 @@ from typing import Optional, List, Dict
 import polars as pl
 from epichronos.core import MethylationDataset
 
+def generate_ai_report(dataset, dmr_df, enrich_df, clock_df, decon_df, api_key):
+    return EpigeneticCopilot.generate_discussion_draft(
+        dataset=dataset, dmr_df=dmr_df, enrich_df=enrich_df,
+        clock_df=clock_df, decon_df=decon_df, api_key=api_key
+    )
+
 class EpigeneticCopilot:
     """
-    A Universal OpenAI-Compatible AI Research Assistant and Literature Synthesis Copilot for EpiChronos.
-    Ingests downstream epigenetic results and generates publication-ready scientific discussion drafts.
+    AI-assisted epigenetic interpretation module.
+
+    This class uses static methods only and is NOT instantiated with api_key/model arguments.
+
+    Usage:
+        report = EpigeneticCopilot.generate_discussion_draft(
+            dataset=dataset,
+            dmr_df=dmr_df,
+            enrich_df=enrich_df,
+            clock_df=clock_df,
+            decon_df=cell_df,
+            api_key="your_openai_api_key"
+        )
+
+    Do NOT call: EpigeneticCopilot(api_key=...) — this will raise TypeError.
     """
     
     @staticmethod

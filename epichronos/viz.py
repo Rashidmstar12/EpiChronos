@@ -98,14 +98,23 @@ def generate_report(
     pca_div = plot(fig_pca, output_type="div", include_plotlyjs=False)
 
     # 2. Generate Volcano Plot of DMLs
-    volc_data = dml_df.to_pandas()
+    # Define significance status in Polars
+    # Significant: p_value <= 0.05 and abs(mean_diff) >= 0.1
+    sig_expr = (pl.col("p_value") <= 0.05) & (pl.col("mean_diff").abs() >= 0.1)
+    
+    dml_sig = dml_df.filter(sig_expr).with_columns(pl.lit("Significant").alias("status"))
+    dml_not_sig = dml_df.filter(~sig_expr).with_columns(pl.lit("Not Significant").alias("status"))
+    
+    # Subsample Not Significant points to keep the plot lightweight and fast
+    if dml_not_sig.height > 20000:
+        dml_not_sig = dml_not_sig.sample(n=20000, seed=42)
+        
+    volc_df = pl.concat([dml_sig, dml_not_sig])
+    volc_data = volc_df.to_pandas()
+    
     # Log transform p-values
     volc_data["neg_log_p"] = -np.log10(volc_data["p_value"] + 1e-300)
     volc_data["hover_text"] = volc_data["chrom"] + ":" + volc_data["pos"].astype(str)
-    
-    # Define significance status
-    volc_data["status"] = "Not Significant"
-    volc_data.loc[(volc_data["p_value"] <= 0.05) & (volc_data["mean_diff"].abs() >= 0.1), "status"] = "Significant"
     
     fig_volc = px.scatter(
         volc_data, 

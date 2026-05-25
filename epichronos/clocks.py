@@ -301,15 +301,18 @@ def calculate_intrinsic_age_acceleration(
         pl.col("biological_age").is_not_null()
     )
     
-    if joined.height < 3:
-        raise ValueError(
-            f"Insufficient samples ({joined.height}) to perform multi-variable linear regression. "
-            "At least 3 samples with chronological age are required."
-        )
-        
     # Extract cell-type columns dynamically (excluding sample, biological_age, chronological_age, and age_acceleration if present)
     exclude_cols = {"sample", "biological_age", "chronological_age", "age_acceleration"}
     cell_cols = [c for c in cell_df.columns if c not in exclude_cols]
+    
+    n_cell_predictors = len(cell_cols) - 1  # one cell type dropped for dummy variable trap
+    min_required = n_cell_predictors + 3    # intercept + chronological_age + cell predictors + 2 minimum df
+    if joined.height < min_required:
+        raise ValueError(
+            f"Insufficient samples ({joined.height}) for intrinsic age acceleration regression. "
+            f"With {len(cell_cols)} cell types, at least {min_required} samples with "
+            f"chronological age are required to avoid a saturated (zero-residual) model."
+        )
     
     # Multicollinearity check (dummy variable trap):
     # Since cell proportions sum to exactly 1.0, including all cell types plus an intercept

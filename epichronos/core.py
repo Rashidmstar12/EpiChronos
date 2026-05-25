@@ -1,6 +1,7 @@
 import polars as pl
 import numpy as np
 import os
+import math
 from typing import List, Dict, Union, Optional, Tuple
 
 class MethylationDataset:
@@ -47,6 +48,21 @@ class MethylationDataset:
             assert "pos" in self.cov_df.columns, "cov_df must contain a 'pos' column"
             # Verify shapes and coordinates match
             assert self.beta_df.shape[0] == self.cov_df.shape[0], "beta_df and cov_df must have the same number of rows"
+            
+            # Verify (chrom, pos) coordinates are identical between beta_df and cov_df
+            beta_coords = self.beta_df.select(["chrom", "pos"])
+            cov_coords  = self.cov_df.select(["chrom", "pos"])
+            assert beta_coords.equals(cov_coords), (
+                "beta_df and cov_df must have identical (chrom, pos) coordinates in the same order. "
+                "Got different coordinates — ensure both DataFrames are aligned before constructing MethylationDataset."
+            )
+            # Verify sample column names are identical
+            beta_samples = [c for c in self.beta_df.columns if c not in ["chrom", "pos"]]
+            cov_samples  = [c for c in self.cov_df.columns  if c not in ["chrom", "pos"]]
+            assert beta_samples == cov_samples, (
+                f"beta_df and cov_df must have identical sample columns in the same order. "
+                f"beta_df samples: {beta_samples}, cov_df samples: {cov_samples}"
+            )
 
     @property
     def shape(self):
@@ -78,7 +94,8 @@ class MethylationDataset:
         cov_cols = [col for col in self.cov_df.columns if col not in ["chrom", "pos"]]
         
         # Apply filter expression
-        expr = pl.sum_horizontal([pl.col(c) >= min_cov for c in cov_cols]) >= (len(cov_cols) * min_samples_ratio)
+        threshold = math.ceil(len(cov_cols) * min_samples_ratio)
+        expr = pl.sum_horizontal([pl.col(c) >= min_cov for c in cov_cols]) >= threshold
         filtered_indices = self.cov_df.filter(expr).select(["chrom", "pos"])
         
         # Semi-join to keep only passed sites
@@ -96,12 +113,11 @@ class MethylationDataset:
         """
         sample_cols = self.samples
         
-        # Vectorized row-wise variance calculation using Polars
-        # Var = E[X^2] - (E[X])^2
-        mean_expr = pl.sum_horizontal([pl.col(c) for c in sample_cols]) / len(sample_cols)
-        sq_mean_expr = pl.sum_horizontal([pl.col(c)**2 for c in sample_cols]) / len(sample_cols)
+        # Use fill_null(0.0) on NaN/null values so variance is computed on real numbers
+        # NaN comparison in Polars returns null which bypasses filter — this prevents that
+        mean_expr    = pl.sum_horizontal([pl.col(c).fill_nan(None).fill_null(0.0) for c in sample_cols]) / len(sample_cols)
+        sq_mean_expr = pl.sum_horizontal([pl.col(c).fill_nan(None).fill_null(0.0)**2 for c in sample_cols]) / len(sample_cols)
         var_expr = sq_mean_expr - (mean_expr**2)
-        
         filtered_df = self.beta_df.filter(var_expr >= min_var)
         
         new_cov = None
@@ -114,27 +130,24 @@ class MethylationDataset:
     def impute_missing(self, method: str = "mean") -> 'MethylationDataset':
         """
         Impute missing (NaN or Null) methylation beta values.
-        
+
         Args:
             method: Imputation method ('mean', 'median', or 'zero').
         """
-        imputed_beta = self.beta_df.clone()
-        
+        exprs = []
         for sample in self.samples:
+            col = self.beta_df[sample].drop_nans().drop_nulls()
             if method == "mean":
-                fill_val = imputed_beta[sample].drop_nans().drop_nulls().mean()
+                fill_val = col.mean()
             elif method == "median":
-                fill_val = imputed_beta[sample].drop_nans().drop_nulls().median()
+                fill_val = col.median()
             else:
                 fill_val = 0.0
-                
             if fill_val is None or np.isnan(fill_val):
-                fill_val = 0.5  # Fallback standard default
-                
-            imputed_beta = imputed_beta.with_columns(
-                pl.col(sample).fill_nan(fill_val).fill_null(fill_val)
-            )
-            
+                fill_val = 0.5
+            exprs.append(pl.col(sample).fill_nan(fill_val).fill_null(fill_val))
+        # Single vectorized Polars call — avoids repeated DataFrame cloning
+        imputed_beta = self.beta_df.with_columns(exprs)
         return MethylationDataset(imputed_beta, self.cov_df, self.metadata)
 
     def to_parquet(self, directory: str, prefix: str = "dataset"):
@@ -169,6 +182,11 @@ class MethylationDataset:
         """
         Collapses Watson (x) and Crick (x+1) strand coordinates into a single unified Watson CpG position.
         Computes weighted beta averages based on sample coverages.
+
+        WARNING: This function collapses ALL adjacent (pos, pos+1) pairs on the same chromosome.
+        It assumes the input contains only symmetric CpG dinucleotide sites (standard Bismark CpG-only output).
+        Do NOT call this on CX-context output (CHH/CHG sites) — adjacent non-CpG sites at consecutive
+        coordinates will be incorrectly merged into a single CpG.
         """
         if self.cov_df is None:
             return self
@@ -357,7 +375,13 @@ def load_bismark_coverage(
         # Calculate derived columns: total depth (coverage) and beta value
         ldf = ldf.with_columns([
             (pl.col("methylated") + pl.col("unmethylated")).alias(f"{name}_cov"),
-            (pl.col("methylated").cast(pl.Float64) / (pl.col("methylated") + pl.col("unmethylated")).cast(pl.Float64)).alias(name)
+            pl.when((pl.col("methylated") + pl.col("unmethylated")) == 0)
+              .then(None)
+              .otherwise(
+                  pl.col("methylated").cast(pl.Float64) /
+                  (pl.col("methylated") + pl.col("unmethylated")).cast(pl.Float64)
+              )
+              .alias(name)
         ])
         
         # Filter by coverage per sample early if specified
@@ -497,6 +521,17 @@ def load_array_beta(
                 chroms.append(chrom)
                 positions.append(pos)
                 valid_indices.append(idx)
+            
+    if len(valid_indices) == 0:
+        import warnings
+        warnings.warn(
+            "load_array_beta(): No probes in the input file matched the provided manifest. "
+            "The returned MethylationDataset will be empty. "
+            "Check that your probe IDs (e.g. cg00000029) match the manifest format, "
+            "or supply a custom manifest= argument.",
+            UserWarning,
+            stacklevel=2
+        )
             
     # Filter original dataframe to keep only mapped probes
     filtered_df = df.filter(pl.arange(0, df.height).is_in(valid_indices))

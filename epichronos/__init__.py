@@ -2,7 +2,7 @@
 EpiChronos: A High-Performance, Unified Downstream DNA Methylation & Biological Aging Analysis Suite.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.2"
 
 from epichronos.core import (
     MethylationDataset, 
@@ -16,7 +16,7 @@ from epichronos.clocks import calculate_biological_age, list_available_clocks
 from epichronos.pacemaker import EpigeneticPacemaker
 from epichronos.viz import generate_report
 from epichronos.enrich import annotate_dmrs_to_genes, perform_pathway_enrichment
-from epichronos.ai import EpigeneticCopilot
+from epichronos.ai import EpigeneticCopilot, generate_ai_report
 
 __all__ = [
     "MethylationDataset",
@@ -33,4 +33,5 @@ __all__ = [
     "annotate_dmrs_to_genes",
     "perform_pathway_enrichment",
     "EpigeneticCopilot",
+    "generate_ai_report",
 ]

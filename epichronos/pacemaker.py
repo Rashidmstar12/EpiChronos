@@ -157,35 +157,39 @@ class EpigeneticPacemaker:
         sample_names = dataset.samples
         n_samples = len(sample_names)
         
-        # Align dataset coordinate values with model sites
-        S = np.zeros((len(self.rates_), n_samples))
-        df = dataset.beta_df
+        # Align dataset coordinate values with model sites using Polars high-speed inner join
+        model_df = pl.DataFrame({
+            "chrom": self.chroms_,
+            "pos": self.positions_,
+            "rate": self.rates_,
+            "intercept": self.intercepts_
+        })
         
-        # Coordinate-wise alignment
-        for i in range(len(self.rates_)):
-            chrom = self.chroms_[i]
-            pos = self.positions_[i]
+        # Inner join to align coordinate space
+        aligned = model_df.join(dataset.beta_df, on=["chrom", "pos"], how="inner")
+        
+        if aligned.height == 0:
+            # Fallback if no overlap
+            t_predicted = np.full(n_samples, self.mean_chron_)
+        else:
+            S = aligned.select(sample_names).to_numpy().astype(np.float64)
+            rates = aligned["rate"].to_numpy().astype(np.float64)
+            intercepts = aligned["intercept"].to_numpy().astype(np.float64)
             
-            site_row = df.filter((pl.col("chrom") == chrom) & (pl.col("pos") == pos))
-            if site_row.height > 0:
-                for j, sample in enumerate(sample_names):
-                    val = site_row[sample][0]
-                    S[i, j] = float(val) if val is not None and not np.isnan(val) else self.intercepts_[i]
-            else:
-                # Missing CpG coordinate: impute with intercept (initial level)
-                for j in range(n_samples):
-                    S[i, j] = self.intercepts_[i]
+            # Impute NaNs with intercepts
+            for j in range(n_samples):
+                nan_mask = np.isnan(S[:, j])
+                if np.any(nan_mask):
+                    S[nan_mask, j] = intercepts[nan_mask]
                     
-        # Vectorized prediction
-        r_sum_sq = np.sum(self.rates_**2)
-        if r_sum_sq == 0.0:
-            r_sum_sq = 1.0
+            # Vectorized prediction
+            r_sum_sq = np.sum(rates**2)
+            if r_sum_sq == 0.0:
+                r_sum_sq = 1.0
+                
+            t_raw = np.dot(rates, S - intercepts[:, np.newaxis]) / r_sum_sq
+            t_predicted = (t_raw - self.mean_t_) / self.std_t_ * self.std_chron_ + self.mean_chron_
             
-        t_raw = np.dot(self.rates_, S - self.intercepts_[:, np.newaxis]) / r_sum_sq
-        
-        # Apply training chronological scale factors
-        t_predicted = (t_raw - self.mean_t_) / self.std_t_ * self.std_chron_ + self.mean_chron_
-        
         # Compile results
         out_dict = {
             "sample": sample_names,
