@@ -28,6 +28,7 @@ pyaging_data/
 *.parquet
 *.json
 *.cov
+*.docx
 
 # EXCEPT key package resources and validation results!
 !epichronos/resources/*.json
