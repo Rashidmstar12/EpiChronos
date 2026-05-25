@@ -29,6 +29,7 @@ pyaging_data/
 *.json
 *.cov
 *.docx
+*.pdf
 *biorxiv*
 realdata/clock_accuracy_correlation.png
 realdata/statistical_concordance_benchmarks.png
