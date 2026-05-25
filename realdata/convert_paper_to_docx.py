@@ -184,6 +184,8 @@ def convert_md_to_docx(md_path, docx_path):
         p.paragraph_format.line_spacing = 1.15
         _add_formatted_text(p, line)
 
+    doc.save(docx_path)
+
 def _add_formatted_text(paragraph, text):
     # Regex to extract bold **text** and inline `code` and $math$
     tokens = re.split(r"(\*\*.*?\*\*|`.*?`|\$.*?\$)", text)
