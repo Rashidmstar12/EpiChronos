@@ -76,10 +76,10 @@ draw_box(ax, 6.5, 2.1, 2.3, 0.9, "Horvath / Hannum / EPM\ncoordinate-aware clock
 draw_box(ax, 6.5, 1.0, 2.3, 0.9, "eQTM transcript linkage\nMSigDB pathway ORA", "Functional Annotation", color_module, border_module)
 
 # Connect Modules to Outputs
-draw_arrow(ax, 8.9, 4.75, 9.6, 3.8)
-draw_arrow(ax, 8.9, 3.65, 9.6, 3.6)
-draw_arrow(ax, 8.9, 2.55, 9.6, 3.3)
-draw_arrow(ax, 8.9, 1.45, 9.6, 3.1)
+draw_arrow(ax, 8.9, 4.75, 9.6, 3.7)
+draw_arrow(ax, 8.9, 3.65, 9.6, 3.3)
+draw_arrow(ax, 8.9, 2.55, 9.6, 2.4)
+draw_arrow(ax, 8.9, 1.45, 9.6, 2.0)
 
 # Column 4: OUTPUTS
 ax.text(10.75, 5.7, "4. REPRODUCIBLE OUTPUTS", ha='center', va='center', fontsize=11, fontweight='bold', color=border_output)
