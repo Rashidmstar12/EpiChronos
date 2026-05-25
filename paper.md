@@ -11,6 +11,9 @@ authors:
   - name: Rashid Kadayil
     orcid: 0009-0009-6398-4557
     affiliation: 1
+  - name: Sivaranjani Chanemougame
+    orcid: 0009-0005-2014-5439
+    affiliation: 1
 affiliations:
   - index: 1
     name: Department of Biotechnology, Pondicherry University, Puducherry, India
@@ -88,5 +91,9 @@ achieved Pearson r=0.918 and r=0.913 respectively against chronological age
 simulated WGBS-scale datasets representing the full hg19 CpG landscape.
 
 ![EpiChronos computational resource scaling compared to traditional R pipelines (bsseq/R) across various CpG density dimensions. Left: peak RAM consumption (MB), highlighting up to 35× memory reduction. Right: execution timeline (seconds), showing up to 72× speed improvement. Fold improvements are annotated. \label{fig:benchmark}](realdata/benchmark_performance.png)
+
+# Author Contributions
+
+RK designed the study, architected the core data engine and mathematical models, implemented the software suite, and drafted the manuscript. SC contributed to software testing, validated pipeline models against real-world DNA methylation datasets, and co-wrote the validation sections of the manuscript.
 
 # References
