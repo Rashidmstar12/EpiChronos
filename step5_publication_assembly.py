@@ -139,12 +139,13 @@ EpiChronos v0.1.2 was validated across four independent benchmarks:
 **Performance:** At 3 million CpGs (WGBS whole-genome scale), EpiChronos required
 367.7 MB RAM and completed in 5.86 seconds, representing a **27.3× reduction in
 memory** and **64.8× improvement in speed** compared to bsseq/R pipelines
-(Park & Wu, 2016; Hansen et al., 2012).
+[@Park2016DSS; @Hansen2012BSmooth]. These scalability profiles are 
+illustrated in \\autoref{fig:benchmark}.
 
 **Statistical accuracy:** On a controlled ground-truth dataset (2,000 true DMLs
 in 52,000 CpG background, n=6/group), EpiChronos achieved sensitivity=0.9975,
-precision=0.9614, F1=0.9791 — exceeding DSS (F1≈0.90), methylKit (F1≈0.78),
-and limma (F1≈0.86). BH-FDR was correctly calibrated with 0 false discoveries
+precision=0.9614, F1=0.9791 — exceeding DSS [@Park2016DSS] (F1≈0.90), methylKit [@Akalin2012MethylKit] (F1≈0.78),
+and limma [@Ritchie2015Limma] (F1≈0.86). BH-FDR was correctly calibrated with 0 false discoveries
 under the global null. Regression and t-test modes showed 100% concordance.
 
 **Clock accuracy:** Horvath clock (353 probes) and Hannum clock (71 probes)

@@ -22,13 +22,13 @@ bibliography: paper.bib
 ---
 # Summary
 
-`EpiChronos` is a high-performance, open-source Python library designed for unified downstream DNA methylation and biological aging analysis. Architected on a multi-threaded, memory-efficient data engine leveraging Apache Arrow and Polars, the library scales seamlessly to large clinical cohorts on standard consumer hardware. It directly parses standard input formats across diverse platforms, including Bismark Whole Genome Bisulfite Sequencing (WGBS) coverage files, Illumina 450K/EPIC microarray beta matrices, and long-read sequencing outputs from Oxford Nanopore and PacBio. From these inputs, `EpiChronos` provides vectorized calling of differentially methylated loci (DML) and clustered regions (DMR), estimates immune cell-type fractions, predicts biological age using assembly-aware Horvath [@horvath2013dna], Hannum [@Hannum2013GenomewideMP], and non-linear Epigenetic Pacemaker [@snir2016statistical] clocks, and maps transcriptomic correlations (eQTM) alongside pathway enrichment. All analyses are compiled into 100% self-contained, interactive HTML reports for immediate quality control and scientific sharing. The modular workflow and unified analytical steps of the library are illustrated in \autoref{fig:workflow}.
+`EpiChronos` is a high-performance, open-source Python library designed for unified downstream DNA methylation and biological aging analysis. Architected on a multi-threaded, memory-efficient data engine leveraging Apache Arrow and Polars, the library scales seamlessly to large clinical cohorts on standard consumer hardware. It directly parses standard input formats across diverse platforms, including Bismark [@Krueger2011Bismark] Whole Genome Bisulfite Sequencing (WGBS) coverage files, Illumina 450K [@Bibikova2011Illumina450K] and EPIC [@Moran2016EPIC] microarray beta matrices, and long-read sequencing outputs from Oxford Nanopore and PacBio. From these inputs, `EpiChronos` provides vectorized calling of differentially methylated loci (DML) and clustered regions (DMR), estimates immune cell-type fractions, predicts biological age using assembly-aware Horvath [@horvath2013dna], Hannum [@Hannum2013GenomewideMP], and non-linear Epigenetic Pacemaker [@snir2016statistical] clocks, and maps transcriptomic correlations (eQTM) [@Bonder2017eQTM] alongside pathway enrichment [@Liberzon2015]. All analyses are compiled into 100% self-contained, interactive HTML reports for immediate quality control and scientific sharing. The modular workflow and unified analytical steps of the library are illustrated in \autoref{fig:workflow}.
 
 ![The unified downstream analysis workflow of EpiChronos. Multi-platform methylation inputs (1) are ingested and aligned by the core Rust-backed Polars data engine (2) into high-performance Apache Arrow memory buffers. Downstream analytical modules (3) perform accelerated DML/DMR calling, constrained deconvolution, biological age prediction, and functional multi-omics/pathway annotations to compile interactive HTML dashboards and machine-readable JSON logs (4). \label{fig:workflow}](realdata/workflow_schematic.png)
 
 # Statement of Need
 
-Bioinformatics workflows for DNA methylation frequently suffer from the "memory wall" of traditional R packages. Traditional R-Bioconductor tools such as bsseq and minfi can require substantial RAM when processing whole-genome bisulfite sequencing datasets of 25–30 million CpGs, creating barriers for researchers without access to high-memory servers. For reference, processing a typical 450K array cohort (n=100, ~480,000 CpGs) in R using `minfi` can require several gigabytes of RAM for large cohorts, while EpiChronos processes 500,000 CpGs using only 61 MB. `EpiChronos` addresses this bottleneck by providing a native Python suite that aligns multi-platform coordinate datasets in contiguous Arrow memory buffers, enabling desktop-level processing of whole-genome profiles. Furthermore, `EpiChronos` bridges the gap between raw methylation values and downstream multi-omics interpretation by integrating epigenetic aging predictions, immune deconvolution, and transcriptomic linkages into a unified suite.
+Bioinformatics workflows for DNA methylation frequently suffer from the "memory wall" of traditional R packages. Traditional R-Bioconductor tools such as bsseq [@Hansen2012BSmooth] and minfi [@Aryee2014Minfi] can require substantial RAM when processing whole-genome bisulfite sequencing datasets of 25–30 million CpGs, creating barriers for researchers without access to high-memory servers. For reference, processing a typical 450K array cohort (n=100, ~480,000 CpGs) in R using `minfi` [@Aryee2014Minfi] can require several gigabytes of RAM for large cohorts, while EpiChronos processes 500,000 CpGs using only 61 MB. `EpiChronos` addresses this bottleneck by providing a native Python suite that aligns multi-platform coordinate datasets in contiguous Arrow memory buffers, enabling desktop-level processing of whole-genome profiles. Furthermore, `EpiChronos` bridges the gap between raw methylation values and downstream multi-omics interpretation by integrating epigenetic aging predictions, immune deconvolution, and transcriptomic linkages into a unified suite.
 
 # Mathematical & Implementation Foundations
 
@@ -41,21 +41,21 @@ For cohort comparisons, `EpiChronos` implements a vectorized Welch's $t$-test wi
 
 $$t = \frac{\bar{X}_1 - \bar{X}_2}{\sqrt{\frac{s_1^2}{N_1} + \frac{s_2^2}{N_2}}}$$
 
-with Welch–Satterthwaite degrees of freedom $\nu$ dynamically computed for every locus. False Discovery Rate (FDR) corrections are applied using vectorized Benjamini–Hochberg procedures.
+with Welch–Satterthwaite degrees of freedom $\nu$ dynamically computed for every locus. False Discovery Rate (FDR) corrections are applied using vectorized Benjamini–Hochberg [@Benjamini1995FDR] procedures.
 
 ## Cell-Type Deconvolution & Epigenetic Clocks
 To isolate confounding cell-type shifts in heterogeneous tissue (such as peripheral blood), `EpiChronos` implements a constrained projection solver based on the Houseman algorithm [@Houseman2012DNAMA]. For a sample methylation vector $\mathbf{y}$ and reference matrix $\mathbf{M}$ compiled from purified blood cell fractions [@reinius2012differential], the cell-type weight vector $\mathbf{w}$ is estimated via constrained OLS using a precomputed Moore-Penrose pseudo-inverse of the Reinius et al. reference panel:
 
 $$\min_{\mathbf{w}} \|\mathbf{y} - \mathbf{M}\mathbf{w}\|^2_2 \quad \text{subject to} \quad w_k \ge 0, \sum_k w_k = 1$$
 
-Biological age is predicted using assembly-aware Horvath [@horvath2013dna] and Hannum [@Hannum2013GenomewideMP] clocks with optional GRCh38 coordinate translation via pyliftover. For non-linear aging dynamics, we implement the Epigenetic Pacemaker (EPM) framework [@snir2016statistical], which models the methylation state $\hat{y}_{ij}$ of CpG site $j$ in sample $i$ using alternating coordinate descent to solve:
+Biological age is predicted using assembly-aware Horvath [@horvath2013dna] and Hannum [@Hannum2013GenomewideMP] clocks with optional GRCh38 coordinate translation via pyliftover [@Hinrichs2006UCSC]. For non-linear aging dynamics, we implement the Epigenetic Pacemaker (EPM) framework [@snir2016statistical], which models the methylation state $\hat{y}_{ij}$ of CpG site $j$ in sample $i$ using alternating coordinate descent to solve:
 
 $$\hat{y}_{ij} = f(t_i; \mathbf{a}_j)$$
 
 where $t_i$ represents the epigenetic state of sample $i$, and $\mathbf{a}_j$ represents site-specific parameters.
 
 ## Multi-Omics Transcription Linkage (eQTM) & Pathway ORA
-`EpiChronos` bridges epigenetics and transcriptomics through expression quantitative trait methylation (eQTM) analysis. The library correlates called Differentially Methylated Regions (DMRs) with matching sample RNA-seq expression vectors to assess functional status (such as promoter hypermethylation leading to gene silencing). Downstream pathways are analyzed via Hypergeometric Overrepresentation Analysis (ORA) against MSigDB Hallmark gene sets [@Liberzon2015] using:
+`EpiChronos` bridges epigenetics and transcriptomics through expression quantitative trait methylation (eQTM) [@Bonder2017eQTM] analysis. The library correlates called Differentially Methylated Regions (DMRs) with matching sample RNA-seq expression vectors to assess functional status (such as promoter hypermethylation leading to gene silencing). Downstream pathways are analyzed via Hypergeometric Overrepresentation Analysis (ORA) against MSigDB Hallmark gene sets [@Liberzon2015] using:
 
 $$P(X \ge k) = \sum_{i=k}^{n} \frac{\binom{K}{i} \binom{N-K}{n-i}}{\binom{N}{n}}$$
 
@@ -78,8 +78,8 @@ illustrated in \autoref{fig:benchmark}.
 
 **Statistical accuracy:** On a controlled ground-truth dataset (2,000 true DMLs
 in 52,000 CpG background, n=6/group), EpiChronos achieved sensitivity=0.9975,
-precision=0.9614, F1=0.9791 — exceeding DSS (F1≈0.90), methylKit (F1≈0.78),
-and limma (F1≈0.86). BH-FDR was correctly calibrated with 0 false discoveries
+precision=0.9614, F1=0.9791 — exceeding DSS [@Park2016DSS] (F1≈0.90), methylKit [@Akalin2012MethylKit] (F1≈0.78),
+and limma [@Ritchie2015Limma] (F1≈0.86). BH-FDR was correctly calibrated with 0 false discoveries
 under the global null. Regression and t-test modes showed 100% concordance.
 
 **Clock accuracy:** Horvath clock (353 probes) and Hannum clock (71 probes)
