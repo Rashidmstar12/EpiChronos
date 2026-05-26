@@ -4,7 +4,7 @@ color 0A
 
 echo.
 echo  ============================================================
-echo       EpiChronos v0.1.0 - Epigenetic Analysis Suite
+echo       EpiChronos v0.1.2 - Epigenetic Analysis Suite
 echo  ============================================================
 echo.
 echo  Starting up... Please wait.
